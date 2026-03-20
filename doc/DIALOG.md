@@ -145,14 +145,7 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 
 **Result:**
 
-<table><tr><td bgcolor="black"><div align="left">
-
-${\color{lightgray}\mathtt{Please\ enter\ your\ information:}}$
-<br>${\mathtt{\ \ }{\color{green}\mathtt{Name}}{\color{lightgray}\mathtt{\ \ :\ Loic\ Ade}}}$
-<br>${\color{lightgray}\mathord{\mathtt{>}}{\mathtt{\ }}{\color{dodgerblue}\mathtt{Email}}{\color{lightgray}\mathtt{\ :\ fake\text{@}email.com█}}}$
-<br>${\color{lightgray}\mathtt{\ OK\ \ \ \ \ Cancel}}$
-
-</div></td></tr></table>
+![Simple form dialog](images/simple_form.png)
 
 ### A selection with checkboxes
 
