@@ -149,7 +149,7 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 
 ${\color{lightgray}\mathtt{Please\ enter\ your\ information:}}$
 <br>${\mathtt{\ \ }}{\color{green}\mathtt{Name}}{\color{lightgray}\mathtt{\ \ :\ Loic\ Ade}}$
-<br>${\color{lightgray}\mathtt{\gt\ }}$ ${\color{dodgerblue}\mathtt{Email}}$ ${\color{lightgray}\mathtt{:\ fake@email.com█}}$
+<br>${\color{lightgray}\mathtt{>\ }}$ ${\color{dodgerblue}\mathtt{Email}}$ ${\color{lightgray}\mathtt{:\ fake\text{@}email.com█}}$
 <br>${\color{lightgray}\mathtt{\ OK\ \ \ \ \ Cancel}}$
 
 </div></td></tr></table>
