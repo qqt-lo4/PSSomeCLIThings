@@ -147,8 +147,8 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 
 ```ansi
  Please enter your information:
-   [32mName[0m  : Loic Ade
- [37m>[0m [34mEmail[0m : fake@email.com█
+   [32mName[0m  : Loic Ade
+ [37m>[0m [34mEmail[0m : fake@email.com█
    OK      Cancel
 ```
 
