@@ -145,13 +145,13 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 
 **Result:**
 
-```
-Please enter your information:
-  Name  : Loic Ade
-> Email : fake@email.com█
- OK     Cancel
-```
-> ${\color{green}\textsf{Name}}$ is green (unfocused header), ${\color{dodgerblue}\textsf{Email}}$ is blue (focused header), `>` marks the focused row, `█` is the cursor.
+$${\color{white}\textsf{Please enter your information:}}$$
+
+$${\color{white}\textsf{\ \ }{\color{green}\textsf{Name}}\ \textsf{\ : Loic Ade}}$$
+
+$${\color{white}\textsf{> }{\color{dodgerblue}\textsf{Email}}\ \textsf{: fake\@email.com█}}$$
+
+$${\color{white}\textsf{\ OK\ \ \ \ \ Cancel}}$$
 
 ### A selection with checkboxes
 
