@@ -144,6 +144,8 @@ $menu = New-Menu -Text "Main Menu" -Content @(
 Invoke-Menu -Menu $menu
 ```
 
+![Invoke-Menu](doc/images/Invoke-Menu.png) ![Invoke-Menu - sub](doc/images/Invoke-Menu%20-%20sub.png)
+
 ### Custom formatted table
 ```powershell
 Get-Process | Select-Object -First 10 | Format-TableCustom -Property Name, Id, CPU -HeaderColor Cyan -HeaderUnderline
@@ -155,6 +157,8 @@ Get-Process | Select-Object -First 10 | Format-TableCustom -Property Name, Id, C
 ```powershell
 "Error: File not found at C:\Temp\file.txt" | Write-ColoredString -Pattern "Error" -MatchForegroundColor Red
 ```
+
+![Write-ColoredString](doc/images/Write-ColoredString.png)
 
 ## Module Structure
 
