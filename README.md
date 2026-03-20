@@ -123,6 +123,8 @@ $schema = [ordered]@{
 $result = Read-CLIDialogHashtable -Properties $schema -Header "Please enter your information"
 ```
 
+![Build a form dialog](doc/images/build%20a%20form%20dialog.png)
+
 ### Interactive object selection
 ```powershell
 # Select a service from a paginated list
@@ -130,6 +132,8 @@ $service = Get-Service | Select-CLIDialogObjectInArray -SelectedColumns Name, St
                                                        -Sort Name `
                                                        -ItemsPerPage 15
 ```
+
+![Interactive object selection](doc/images/Interactive%20object%20selection.png)
 
 ### Build a menu
 ```powershell
