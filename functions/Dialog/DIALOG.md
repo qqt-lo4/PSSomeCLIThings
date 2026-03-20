@@ -146,12 +146,10 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 **Result:**
 
 <table><tr><td bgcolor="black">
-<br>${\color{lightgray}\texttt{Please enter your information:}}$
+${\color{lightgray}\texttt{Please enter your information:}}$
 <br>${\texttt{\ \ }}{\color{green}\texttt{Name}}{\color{lightgray}\texttt{\ \ : Loic Ade}}$
 <br>${\color{lightgray}\texttt{&#62;\ }}{\color{dodgerblue}\texttt{Email}}{\color{lightgray}\texttt{\ : fake@email.com█}}$
 <br>${\color{lightgray}\texttt{\ OK\ \ \ \ \ Cancel}}$
-
-<br>
 </td></tr></table>
 
 ### A selection with checkboxes
