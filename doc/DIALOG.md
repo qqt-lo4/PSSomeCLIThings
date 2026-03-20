@@ -183,11 +183,11 @@ $rows = @(
 
     New-CLIDialogObjectsRow -Row @(
         New-CLIDialogButton -Text "&OK" -Validate
-    )
+    ) -InvisibleHeader
 )
 
 $result = Invoke-CLIDialog -InputObject $rows
-$format = $result.DialogResult.Form.GetValue().Format
+$format = $result.Value.Format
 # $format will be "json", "xml", or "csv"
 ```
 
