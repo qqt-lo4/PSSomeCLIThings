@@ -114,16 +114,19 @@ function Read-CLIDialogIP {
     )
 
     # Create custom validation scriptblock using Test-StringIsIP
+    $bAllowEmpty = [bool]$AllowEmpty
+    $bMandatoryMask = [bool]$MandatoryMask
+    $bMaskForbidden = [bool]$MaskForbidden
     $validationScript = {
         param($value)
 
-        # If value is empty and AllowEmpty is set, accept it
-        if (($value -eq "") -and $args[0]) {
-            return $true
+        # If value is empty
+        if ($value -eq "") {
+            return $bAllowEmpty
         }
 
         # Use Test-StringIsIP for validation
-        $result = Test-StringIsIP -string $value -MandatoryMask:$args[1] -MaskForbidden:$args[2]
+        $result = Test-StringIsIP -string $value -MandatoryMask:$bMandatoryMask -MaskForbidden:$bMaskForbidden
         return $null -ne $result
     }.GetNewClosure()
 

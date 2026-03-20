@@ -153,11 +153,9 @@ function Select-CLIFileFromFolder {
         Recursive scan with custom empty message and full path display.
 
     .NOTES
-        Module: CLIDialog
         Author: Loïc Ade
         Created: 2024-09-16
-        Version: 1.1.0
-        Dependencies: Select-CLIDialogObjectInArray, New-CLIDialogButton, Get-ChildItem
+        Version: 1.2.0
 
         This function is designed for scenarios where users need to select a file from a folder
         interactively, with options for manual path entry and optional file selection.
@@ -271,6 +269,9 @@ function Select-CLIFileFromFolder {
 
         CHANGELOG:
 
+        Version 1.2.0 - 2026-03-08 - Loïc Ade
+            - Added AllowBack parameter to display a Back button
+
         Version 1.1.0 - 2025-11-22 - Loïc Ade
             - Added ItemsPerPage parameter to allow configurable number of items per page
 
@@ -296,6 +297,7 @@ function Select-CLIFileFromFolder {
         [switch]$ShowFile,
         [switch]$AllowOtherFile,
         [switch]$AllowNoFile,
+        [switch]$AllowBack,
         [switch]$AllowExit,
         [string]$SelectHeaderMessage = "Please select an item:",
         [string]$ColumnName = "Folder Name",
@@ -348,6 +350,9 @@ function Select-CLIFileFromFolder {
     }
     if ($AllowNoFile) {
         $aOtherMenuItems += New-CLIDialogButton -DoNotSelect -Text "Do &not select a file"
+    }
+    if ($AllowBack) {
+        $aOtherMenuItems += New-CLIDialogButton -Back -Text "&Back"
     }
     if ($AllowExit) {
         $aOtherMenuItems += New-CLIDialogButton -Exit -Text "&Exit"
