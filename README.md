@@ -149,6 +149,8 @@ Invoke-Menu -Menu $menu
 Get-Process | Select-Object -First 10 | Format-TableCustom -Property Name, Id, CPU -HeaderColor Cyan -HeaderUnderline
 ```
 
+![Format-TableCustom](doc/images/Format-TableCustom.png)
+
 ### Colored string output
 ```powershell
 "Error: File not found at C:\Temp\file.txt" | Write-ColoredString -Pattern "Error" -MatchForegroundColor Red
