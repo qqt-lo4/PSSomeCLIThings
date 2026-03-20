@@ -169,6 +169,10 @@ $result = Invoke-CLIDialog -InputObject $dialog
 # $selectedItems.Value now contains the selected service objects
 ```
 
+**Result:**
+
+![Checkboxes selection](images/checkboxes_selection.png)
+
 ### Radio button selection
 
 ```powershell
@@ -190,6 +194,10 @@ $result = Invoke-CLIDialog -InputObject $rows
 $format = $result.Value.Format
 # $format will be "json", "xml", or "csv"
 ```
+
+**Result:**
+
+![Radio button selection](images/radio_button_selection.png)
 
 ---
 
