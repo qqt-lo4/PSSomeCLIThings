@@ -145,12 +145,13 @@ switch -Wildcard ($result.PSTypeNames[0]) {
 
 **Result:**
 
-<pre style="background-color: #0C0C0C; color: #CCCCCC; padding: 10px; font-family: Consolas, monospace;">
+```
 Please enter your information:
-  <span style="color: #16C60C;">Name</span>  : Loic Ade
-> <span style="color: #3B78FF;">Email</span> : fake@email.com█
- <span style="background-color: #CCCCCC; color: #0C0C0C;"> OK </span>     Cancel
-</pre>
+  Name  : Loic Ade
+> Email : fake@email.com█
+ OK     Cancel
+```
+> ${\color{green}\textsf{Name}}$ is green (unfocused header), ${\color{dodgerblue}\textsf{Email}}$ is blue (focused header), `>` marks the focused row, `█` is the cursor.
 
 ### A selection with checkboxes
 
