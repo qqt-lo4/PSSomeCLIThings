@@ -112,6 +112,8 @@ $answer = Invoke-YesNoCLIDialog -Message "Do you want to continue?" -YN
 # Returns "Yes" or "No"
 ```
 
+![Simple Yes/No dialog](doc/images/simple%20yes%20no%20dialog.png)
+
 ### Build a form dialog
 ```powershell
 # Collect user information via a hashtable form
