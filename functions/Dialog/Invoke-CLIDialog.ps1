@@ -188,7 +188,7 @@ function Invoke-CLIDialog {
 
         Version 1.1.0 - 2026-03-20 - Loïc Ade
             - Corrected : Object result value property returns now selected
-               items when checkboxes were used
+               items when checkboxes were used, or form result if form is valid
 
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
@@ -262,8 +262,12 @@ function Invoke-CLIDialog {
                     { $_ -in @("Action", "Action_Scriptblock") } {
                         if ($hResult.Form.SelectedObjectsArray) {
                             return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $hResult.Form.SelectedObjectsArray
+                        } elseif ($oResult.Object) {
+                            return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $oResult.Object
+                        } elseif ($Dialog.IsValidForm()) {
+                            return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $hResult.Form.GetValue()
                         } else {
-                            return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $oResult.Object 
+                            return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $oResult.Object
                         }
                     }
                     "Scriptblock" {
