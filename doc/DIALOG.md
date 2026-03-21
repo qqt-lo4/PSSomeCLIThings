@@ -39,6 +39,8 @@ A comprehensive PowerShell framework for building fully interactive CLI dialogs 
   - [Select-CLIDialogCSVFile](#select-clidialogcsvfile)
   - [Select-CLIDialogJsonFile](#select-clidialogjsonfile)
   - [Select-CLIFileFromFolder](#select-clifilefromfolder)
+  - [Invoke-CLIDialogWizard](#invoke-clidialogwizard)
+  - [New-CLIDialogWizardStep](#new-clidialogwizardstep)
 - [Patterns and Recipes](#patterns-and-recipes)
 - [Keyboard Navigation](#keyboard-navigation)
 
@@ -908,6 +910,57 @@ $file = Select-CLIFileFromFolder -Path "C:\Scripts" -Filter "*.ps1" `
     -Recurse -AllowOtherFile -AllowNoFile
 # Returns: FileInfo object or DialogResult for special actions
 ```
+
+---
+
+### Invoke-CLIDialogWizard
+
+Manages a succession of dialog steps to build an object progressively. Supports Back navigation and Exit. Each step's result is stored under its `PropertyName`.
+
+```powershell
+$steps = @(
+    New-CLIDialogWizardStep -PropertyName "Server" -Header "Step 1/3" -ScriptBlock {
+        param($result)
+        # Get-HostRegex is from the PSSomeDataThings module
+        Read-CLIDialogValidatedValue -Header "Enter server name" -PropertyName "Server" -ValidationMethod (Get-HostRegex -FullLine) -AllowBack
+    }
+    New-CLIDialogWizardStep -PropertyName "Port" -Header "Step 2/3" -ScriptBlock {
+        param($result)
+        Read-CLIDialogNumericValue -Header "Enter port" -PropertyName "Port" -Min 1 -Max 65535 -AllowBack -ReturnDialogResult
+    }
+    New-CLIDialogWizardStep -PropertyName "Credential" -Header "Step 3/3" -ScriptBlock {
+        param($result)
+        Read-CLIDialogCredential -Message "Enter credentials:" -AllowBack -ReturnDialogResult
+    }
+)
+$config = Invoke-CLIDialogWizard -Steps $steps
+# Returns: PSCustomObject with Server, Port, Credential properties (or $null if exited)
+```
+
+![Invoke-CLIDialogWizard](images/Invoke-CLIDialogWizard.png)
+
+| Parameter | Type | Description |
+|---|---|---|
+| `Steps` | `array` | Array of wizard step definitions created with `New-CLIDialogWizardStep`. |
+| `InitialObject` | `object` | Optional initial object to pre-populate properties. |
+| `HeaderForegroundColor` | `ConsoleColor` | Color for step headers. Default: `Green`. |
+
+### New-CLIDialogWizardStep
+
+Creates a step definition for `Invoke-CLIDialogWizard`. Each step contains a scriptblock that displays a dialog and returns a DialogResult.
+
+```powershell
+New-CLIDialogWizardStep -PropertyName "Server" -Header "Step 1" -ScriptBlock {
+    param($result)
+    Read-CLIDialogValidatedValue -Header "Enter server name" -PropertyName "Server"
+}
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `PropertyName` | `string` | Name of the property in the output object where the step result will be stored. |
+| `ScriptBlock` | `scriptblock` | ScriptBlock that displays the dialog. Receives the current output object as parameter. |
+| `Header` | `string` | Optional header text displayed before the step. |
 
 ---
 

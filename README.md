@@ -44,6 +44,8 @@ Build interactive CLI dialogs with textboxes, buttons, checkboxes, radio buttons
 | `Select-CLIDialogJsonFile` | JSON file selector that parses and displays file metadata with optional filtering and auto-selection. |
 | `Select-CLIDialogObjectInArray` | Comprehensive paginated object selection dialog with single/multi-select, confirmation, custom menu items, and navigation. |
 | `Select-CLIFileFromFolder` | File selector from a folder with recursive scanning, manual path entry, and file validation. |
+| `Invoke-CLIDialogWizard` | Manages a succession of dialog steps to build an object progressively, with Back navigation and Exit support. |
+| `New-CLIDialogWizardStep` | Creates a step definition for `Invoke-CLIDialogWizard` with a property name, scriptblock, and optional header. |
 
 ### Menu Builder
 Create interactive navigable menus with sub-menus, actions, and scriptblock execution.
