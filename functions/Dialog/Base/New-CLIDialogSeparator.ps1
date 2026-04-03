@@ -103,11 +103,8 @@ function New-CLIDialogSeparator {
         Creates a cyan separator with 2-space prefix using box-drawing character.
 
     .NOTES
-        Module: CLIDialog
         Author: Loïc Ade
-        Created: 2025-10-20
-        Version: 1.0.0
-        Dependencies: None
+        Version: 1.1.0
 
         This function is part of the CLI Dialog framework. It uses parameter sets to ensure
         either AutoLength or Length is used, but not both.
@@ -130,6 +127,9 @@ function New-CLIDialogSeparator {
         - Separator automatically adjusts if Length exceeds console width
 
         CHANGELOG:
+
+        Version 1.1.0 - 2026-04-03 - Loïc Ade
+            - Added support for theme
 
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
@@ -154,7 +154,7 @@ function New-CLIDialogSeparator {
         [int]$PageCount,
         [string]$LeftArrow = "<--",
         [string]$RightArrow = "-->",
-        [System.ConsoleColor]$ForegroundColor = (Get-Host).UI.RawUI.ForegroundColor,
+        [System.ConsoleColor]$ForegroundColor = (Get-CLIDialogTheme SeparatorColor),
         [switch]$PressKeyToContinue,
         [string]$PressKeyToContinueMessage = "Press any key to continue...",
         [string]$Text

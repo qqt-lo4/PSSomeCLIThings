@@ -41,6 +41,9 @@ A comprehensive PowerShell framework for building fully interactive CLI dialogs 
   - [Select-CLIFileFromFolder](#select-clifilefromfolder)
   - [Invoke-CLIDialogWizard](#invoke-clidialogwizard)
   - [New-CLIDialogWizardStep](#new-clidialogwizardstep)
+- [Theme](#theme)
+  - [Get-CLIDialogTheme](#get-clidialogtheme)
+  - [Set-CLIDialogTheme](#set-clidialogtheme)
 - [Patterns and Recipes](#patterns-and-recipes)
 - [Keyboard Navigation](#keyboard-navigation)
 
@@ -264,7 +267,7 @@ Creates an interactive button control with support for value selection, actions,
 **Action switches** (mutually exclusive parameter sets):
 `-Yes`, `-No`, `-Cancel`, `-Back`, `-Exit`, `-Validate`, `-Previous`, `-Next`, `-Refresh`, `-Other`, `-DoNotSelect`, `-GoTo`
 
-**Color parameters**: `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
+**Color parameters** (defaults from [theme](#theme)): `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
 
 #### ButtonType Logic
 
@@ -308,7 +311,7 @@ Creates an editable text input field with cursor navigation, validation, and pas
 | `Prefix` / `FocusedPrefix` | `string` | — | Prefix before the field (e.g., `"  "` / `"> "`) |
 | `Name` | `string` | `"textbox" + Header` | Unique identifier |
 
-**Color parameters**: `TextForegroundColor`, `TextBackgroundColor`, `HeaderForegroundColor` (default Green), `HeaderBackgroundColor`, `FocusedTextForegroundColor`, `FocusedTextBackgroundColor`, `FocusedHeaderForegroundColor` (default Blue), `FocusedHeaderBackgroundColor`
+**Color parameters** (defaults from [theme](#theme)): `TextForegroundColor`, `TextBackgroundColor`, `HeaderForegroundColor`, `HeaderBackgroundColor`, `FocusedTextForegroundColor`, `FocusedTextBackgroundColor`, `FocusedHeaderForegroundColor`, `FocusedHeaderBackgroundColor`, `SelectionForegroundColor`, `SelectionBackgroundColor`, `SelectionCursorBackgroundColor`
 
 #### Key Methods
 
@@ -339,10 +342,16 @@ New-CLIDialogTextBox -Header "Port" -ValidationScript {
 | Key | Action |
 |---|---|
 | Left/Right Arrow | Move cursor |
+| Shift+Left/Right Arrow | Extend selection |
 | Home / End | Jump to start / end |
-| Backspace | Delete character before cursor |
-| Delete | Delete character at cursor |
-| Any printable character | Insert at cursor position |
+| Shift+Home / Shift+End | Extend selection to start / end |
+| Ctrl+A | Select all text |
+| Ctrl+C | Copy selection to clipboard (disabled for password fields) |
+| Ctrl+X | Cut selection to clipboard (disabled for password fields) |
+| Ctrl+V | Paste from clipboard (replaces selection if any) |
+| Backspace | Delete character before cursor (or delete selection) |
+| Delete | Delete character at cursor (or delete selection) |
+| Any printable character | Insert at cursor position (replaces selection if any) |
 | Up/Down/Tab/Enter/Escape | Passed to parent dialog |
 
 ---
@@ -364,7 +373,7 @@ Creates a checkbox control (`[x]`/`[ ]`) for independent multi-selection.
 | `Underline` | `int` | `-1` | Character position to underline |
 | `NoSpace` | `switch` | — | Remove padding spaces |
 
-**Color parameters**: `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
+**Color parameters** (defaults from [theme](#theme)): `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
 
 #### Key Methods
 
@@ -395,7 +404,7 @@ Creates a radio button control (`(x)`/`( )`) for single-selection within a group
 | `Name` | `string` | Auto | Unique identifier |
 | `Underline` | `int` | `-1` | Character position to underline |
 
-**Color parameters**: `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
+**Color parameters** (defaults from [theme](#theme)): `BackgroundColor`, `ForegroundColor`, `FocusedBackgroundColor`, `FocusedForegroundColor`
 
 #### Mutual Exclusion
 
@@ -434,7 +443,7 @@ Groups multiple interactive controls (buttons, checkboxes, radio buttons, spaces
 | `InvisibleHeader` | `switch` | — | Reserve header space without displaying text |
 | `Vertical` | `switch` | — | Stack controls vertically instead of horizontally |
 
-**Color parameters**: `HeaderForegroundColor` (default Green), `HeaderBackgroundColor`, `FocusedHeaderForegroundColor` (default Blue), `FocusedHeaderBackgroundColor`
+**Color parameters** (defaults from [theme](#theme)): `HeaderForegroundColor`, `HeaderBackgroundColor`, `FocusedHeaderForegroundColor`, `FocusedHeaderBackgroundColor`
 
 #### Layout Modes
 
@@ -476,7 +485,7 @@ Creates a static or dynamic text display element.
 | `TextFunctionArguments` | `object` | — | Arguments splatted to `TextFunction` |
 | `AddNewLine` | `switch` | — | Add trailing newline |
 
-**Color parameters**: `BackgroundColor`, `ForegroundColor`
+**Color parameters** (defaults from [theme](#theme)): `BackgroundColor`, `ForegroundColor`
 
 #### Dynamic Text Example
 
@@ -510,7 +519,7 @@ Creates a read-only labeled property display with optional regex highlighting.
 | `Prefix` | `string` | `""` | Indentation prefix |
 | `Name` | `string` | Auto | Unique identifier |
 
-**Color parameters**: `TextForegroundColor`, `TextBackgroundColor`, `MatchTextForegroundColor` (default Blue), `MatchTextBackgroundColor`, `HeaderForegroundColor` (default Green), `HeaderBackgroundColor`
+**Color parameters** (defaults from [theme](#theme)): `TextForegroundColor`, `TextBackgroundColor`, `MatchTextForegroundColor`, `MatchTextBackgroundColor`, `HeaderForegroundColor`, `HeaderBackgroundColor`
 
 #### Example
 
@@ -597,6 +606,8 @@ Generates dialog rows displaying objects in a formatted table layout. This is a 
 | `EnabledObjectsArray` | `ref` | — | Reference to pre-checked items array |
 | `EnabledObjectsUniqueProperty` | `string` | — | Property for matching pre-selected objects |
 | `Space` | `switch` | — | Add space prefix before rows |
+
+**Color parameters** (defaults from [theme](#theme)): `HeaderForegroundColor` (table headers), `ForegroundColor`, `BackgroundColor`, `FocusedForegroundColor`, `FocusedBackgroundColor` (passed to buttons/checkboxes)
 
 #### What It Returns
 
@@ -961,6 +972,68 @@ New-CLIDialogWizardStep -PropertyName "Server" -Header "Step 1" -ScriptBlock {
 | `PropertyName` | `string` | Name of the property in the output object where the step result will be stored. |
 | `ScriptBlock` | `scriptblock` | ScriptBlock that displays the dialog. Receives the current output object as parameter. |
 | `Header` | `string` | Optional header text displayed before the step. |
+
+---
+
+## Theme
+
+All dialog components read their default colors from a centralized theme via `Get-CLIDialogTheme`. This allows changing the look of all dialogs at once without modifying individual component calls.
+
+The theme is stored in the global variable `$Global:CLIDialogTheme` and is initialized automatically on first use.
+
+### Get-CLIDialogTheme
+
+Retrieves the current theme or a specific property.
+
+```powershell
+# Get the full theme hashtable
+$theme = Get-CLIDialogTheme
+
+# Get a specific property (used in component parameter defaults)
+$color = Get-CLIDialogTheme "HeaderForegroundColor"
+```
+
+#### Theme Properties
+
+| Property | Default | Used by |
+|---|---|---|
+| `ForegroundColor` | Console foreground | Text, Button, CheckBox, RadioButton, TableItems |
+| `BackgroundColor` | Console background | Text, Button, CheckBox, RadioButton, TableItems |
+| `HeaderForegroundColor` | `Green` | TextBox, ObjectsRow, Property |
+| `HeaderBackgroundColor` | Console background | TextBox, ObjectsRow, Property |
+| `FocusedHeaderForegroundColor` | `Blue` | TextBox, ObjectsRow |
+| `FocusedHeaderBackgroundColor` | Console background | TextBox, ObjectsRow |
+| `FocusedForegroundColor` | Console background | Button, CheckBox, RadioButton, TableItems |
+| `FocusedBackgroundColor` | Console foreground | Button, CheckBox, RadioButton, TableItems |
+| `SelectionForegroundColor` | Console background | TextBox (selected text) |
+| `SelectionBackgroundColor` | `DarkCyan` | TextBox (selected text) |
+| `SelectionCursorBackgroundColor` | `Blue` | TextBox (cursor in selection) |
+| `ValidationErrorColor` | `Red` | TextBox (invalid field header) |
+| `MatchTextForegroundColor` | `Blue` | Property (pattern matches) |
+| `MatchTextBackgroundColor` | Console background | Property (pattern matches) |
+| `TableHeaderForegroundColor` | `Green` | TableItems (column headers) |
+| `SeparatorColor` | `Blue` | Separator, Menu |
+
+### Set-CLIDialogTheme
+
+Sets or resets the global theme. All parameters have defaults matching the standard theme. Only pass the properties you want to change.
+
+```powershell
+# Reset to defaults
+Set-CLIDialogTheme
+
+# Customize specific colors
+Set-CLIDialogTheme -HeaderForegroundColor Cyan -SelectionBackgroundColor DarkBlue
+
+# Full custom theme
+Set-CLIDialogTheme -HeaderForegroundColor Cyan `
+                   -FocusedHeaderForegroundColor Yellow `
+                   -SeparatorColor DarkGray `
+                   -SelectionBackgroundColor DarkBlue `
+                   -SelectionCursorBackgroundColor Blue
+```
+
+> **Note**: Components resolve their colors at creation time (in parameter defaults). Changing the theme only affects components created after the call to `Set-CLIDialogTheme`.
 
 ---
 

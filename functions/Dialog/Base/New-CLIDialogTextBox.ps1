@@ -87,6 +87,12 @@
         The field name to use in error messages. Useful for identifying which field failed
         validation in forms with multiple text boxes.
 
+    .PARAMETER SelectionForegroundColor
+        The foreground color of selected text. Default is the current console background color.
+
+    .PARAMETER SelectionBackgroundColor
+        The background color of selected text. Default is DarkCyan.
+
     .PARAMETER PasswordChar
         The character to use for masking input (e.g., '*' or '•'). When set, all characters
         are displayed as this character, but the actual text is preserved internally.
@@ -157,7 +163,7 @@
         Module: CLIDialog
         Author: Loïc Ade
         Created: 2025-10-20
-        Version: 1.0.0
+        Version: 2.0.0
         Dependencies: None
 
         This function is part of the CLI Dialog framework. Text boxes are the primary control
@@ -165,12 +171,18 @@
 
         KEYBOARD NAVIGATION:
         - Left/Right Arrow: Move cursor within text
+        - Shift+Left/Right Arrow: Extend selection
         - Home: Jump to beginning of text
         - End: Jump to end of text
-        - Backspace: Delete character before cursor
-        - Delete: Delete character at cursor
+        - Shift+Home/End: Extend selection to start/end
+        - Ctrl+A: Select all text
+        - Ctrl+C: Copy selected text to clipboard (disabled for password fields)
+        - Ctrl+X: Cut selected text to clipboard (disabled for password fields)
+        - Ctrl+V: Paste from clipboard (replaces selection if any)
+        - Backspace: Delete character before cursor (or delete selection)
+        - Delete: Delete character at cursor (or delete selection)
         - Up/Down Arrow: Navigate between text boxes (returns control to dialog)
-        - Regular characters: Insert at cursor position
+        - Regular characters: Insert at cursor position (replaces selection if any)
 
         VALIDATION:
         - Validation is performed on-demand via IsValidText() method
@@ -206,6 +218,22 @@
 
         CHANGELOG:
 
+        Version 2.0.0 - 2026-04-02 - Loïc Ade
+            - Added sliding window for text longer than available width
+            - Left/right arrow indicators (◄/►) for overflow direction
+            - Cursor-centered viewport with smooth scrolling
+            - Overflow indicator in unfocused Draw() method
+            - Added text selection support (Shift+Left/Right/Home/End, Ctrl+A)
+            - Added clipboard support (Ctrl+C copy, Ctrl+V paste, Ctrl+X cut)
+            - Ctrl+C/X disabled for password fields (security)
+            - Selection-aware rendering in DrawFocused (fits and overflow modes)
+            - Selection-aware editing: typing, Backspace, Delete replace selection
+            - New properties: SelectionAnchor, SelectionForegroundColor,
+              SelectionBackgroundColor, SelectionCursorBackgroundColor
+            - New methods: HasSelection, GetSelectionStart, GetSelectionEnd,
+              GetSelectedText, ClearSelection, DeleteSelection, PressSelectAll,
+              PressCopy, PressPaste, PressCut
+
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
             - Full keyboard navigation and text editing
@@ -238,6 +266,9 @@
         [string]$FocusedPrefix,
         [string]$Regex,
         [object]$ValidationScript,
+        [System.ConsoleColor]$SelectionForegroundColor = (Get-Host).UI.RawUI.BackgroundColor,
+        [System.ConsoleColor]$SelectionBackgroundColor = [System.ConsoleColor]::DarkCyan,
+        [System.ConsoleColor]$SelectionCursorBackgroundColor = [System.ConsoleColor]::Blue,
         [System.ConsoleColor]$ValidationErrorColor = [System.ConsoleColor]::Red,
         [string]$ValidationErrorReason,
         [string]$FieldNameInErrorReason,
@@ -277,6 +308,10 @@
         Prefix = $Prefix
         FocusedPrefix = $FocusedPrefix
         CursorPosition = if ($sText) { $sText.Length } else { 0 }
+        SelectionAnchor = $null
+        SelectionForegroundColor = $SelectionForegroundColor
+        SelectionBackgroundColor = $SelectionBackgroundColor
+        SelectionCursorBackgroundColor = $SelectionCursorBackgroundColor
         Regex = $Regex
         ValidationScript = $ValidationScript
         ValidationErrorColor = $ValidationErrorColor
@@ -313,6 +348,51 @@
         }
     }
 
+    $hResult | Add-Member -MemberType ScriptMethod -Name "HasSelection" -Value {
+        return ($null -ne $this.SelectionAnchor -and $this.SelectionAnchor -ne $this.CursorPosition)
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetSelectionStart" -Value {
+        if ($null -eq $this.SelectionAnchor) { return $this.CursorPosition }
+        if ($this.SelectionAnchor -lt $this.CursorPosition) {
+            return $this.SelectionAnchor
+        } else {
+            return $this.CursorPosition
+        }
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetSelectionEnd" -Value {
+        if ($null -eq $this.SelectionAnchor) { return $this.CursorPosition }
+        if ($this.SelectionAnchor -gt $this.CursorPosition) {
+            return $this.SelectionAnchor
+        } else {
+            return $this.CursorPosition
+        }
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetSelectedText" -Value {
+        if (-not $this.HasSelection()) { return "" }
+        $iStart = $this.GetSelectionStart()
+        $iEnd = $this.GetSelectionEnd()
+        return $this.Text.Substring($iStart, $iEnd - $iStart)
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "ClearSelection" -Value {
+        $this.SelectionAnchor = $null
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "DeleteSelection" -Value {
+        if (-not $this.HasSelection()) { return $false }
+        $iStart = $this.GetSelectionStart()
+        $iEnd = $this.GetSelectionEnd()
+        $sPrefix = if ($iStart -gt 0) { $this.Text.Substring(0, $iStart) } else { "" }
+        $sSuffix = if ($iEnd -lt $this.Text.Length) { $this.Text.Substring($iEnd) } else { "" }
+        $this.Text = $sPrefix + $sSuffix
+        $this.CursorPosition = $iStart
+        $this.SelectionAnchor = $null
+        return $true
+    }
+
     $hResult | Add-Member -MemberType ScriptMethod -Name "Draw" -Value {
         $iAlign = if ($this.HeaderAlign -eq "Left") { -1 } else { 1 }
         $sHeader = ("" + $this.Prefix + ("{0,$($this.SeparatorLocation * $iAlign)}" -f $this.Header) + $this.HeaderSeparator)
@@ -322,10 +402,19 @@
             $this.ValidationErrorColor
         }
         Write-Host $sHeader -ForegroundColor $oHeaderColor -BackgroundColor $this.HeaderBackgroundColor -NoNewline
-        $sPrintedTest = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
-        Write-Host $sPrintedTest -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
-        $sRemainingSpace = " " * ($host.ui.RawUI.WindowSize.Width - $sHeader.Length - $this.Text.Length)
-		Write-Host $sRemainingSpace
+        $sPrintedText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
+
+        $iAvailableWidth = $host.ui.RawUI.WindowSize.Width - $sHeader.Length
+        if ($sPrintedText.Length -gt $iAvailableWidth -and $iAvailableWidth -gt 2) {
+            # Text overflows: show the beginning with ► at the end
+            $sVisible = $sPrintedText.Substring(0, $iAvailableWidth - 1)
+            Write-Host $sVisible -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
+            Write-Host ([char]0x25BA) -ForegroundColor DarkYellow -BackgroundColor $this.TextBackgroundColor
+        } else {
+            Write-Host $sPrintedText -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
+            $iRemaining = [Math]::Max(0, $iAvailableWidth - $sPrintedText.Length)
+            Write-Host (" " * $iRemaining)
+        }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "DrawFocused" -Value {
@@ -338,90 +427,301 @@
             $this.ValidationErrorColor
         }
         Write-Host $sPropertyToScreen -NoNewline -ForegroundColor $oHeaderColor -BackgroundColor $this.FocusedHeaderBackgroundColor
-        # Write Text
-        if ($this.Text.Length -gt 0) {
-            if (($this.CursorPosition - 1) -ge 0) {
-                $sTextBefore = ($this.Text[0..$($this.CursorPosition - 1)] -join "")
-                if ($this.PasswordChar) {
-                    $sTextBefore = $this.PasswordChar.ToString() * $sTextBefore.Length
-                }
-                Write-Host $sTextBefore -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-            }
-            if ($this.Text[$this.CursorPosition]) {
-                $sCharMiddle = if ($this.PasswordChar) { $this.PasswordChar.ToString() } else { $this.Text[$this.CursorPosition] }
-                Write-Host $sCharMiddle -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
-            }
-            if ($this.Text[$this.CursorPosition + 1]) {
-                $sTextAfter = ($this.Text[$($this.CursorPosition + 1)..$($this.Text.Length)] -join "")
-                if ($this.PasswordChar) {
-                    $sTextAfter = $this.PasswordChar.ToString() * $sTextAfter.Length
-                }
-                Write-Host $sTextAfter -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-            }
-        }
-        if ($this.CursorPosition -lt 0) {
-            $this.CursorPosition = 0
-        } elseif ($this.CursorPosition -gt $this.Text.Length) {
-            $this.CursorPosition = $this.Text.Length
-        } 
-        if (($this.CursorPosition -eq $this.Text.Length) -or ($this.Text.Length -eq 0)) {
-            Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
-            $sRemainingSpace = " " * ($host.ui.RawUI.WindowSize.Width - $sPropertyToScreen.Length - $this.Text.Length - 1)
-            Write-Host $sRemainingSpace
-        } else {
-            $sRemainingSpace = " " * ($host.ui.RawUI.WindowSize.Width - $sPropertyToScreen.Length - $this.Text.Length)
-            Write-Host $sRemainingSpace
-        }
 
+        # Clamp cursor position
+        if ($this.CursorPosition -lt 0) { $this.CursorPosition = 0 }
+        elseif ($this.CursorPosition -gt $this.Text.Length) { $this.CursorPosition = $this.Text.Length }
+
+        # Prepare display text (with password masking)
+        $sFullText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
+
+        # Available width for text area (1 extra for cursor block at end)
+        $iAvailableWidth = $host.ui.RawUI.WindowSize.Width - $sPropertyToScreen.Length
+        $bCursorAtEnd = ($this.CursorPosition -eq $this.Text.Length)
+        $iCursorExtra = if ($bCursorAtEnd) { 1 } else { 0 }
+
+        # Selection bounds
+        $bHasSelection = $this.HasSelection()
+        $iSelStart = $this.GetSelectionStart()
+        $iSelEnd = $this.GetSelectionEnd()
+
+        if (($sFullText.Length + $iCursorExtra) -le $iAvailableWidth) {
+            # === Text fits entirely ===
+            if ($bHasSelection) {
+                $sBeforeSel = if ($iSelStart -gt 0) { $sFullText.Substring(0, $iSelStart) } else { "" }
+                $sSelected = $sFullText.Substring($iSelStart, $iSelEnd - $iSelStart)
+                $sAfterSel = if ($iSelEnd -lt $sFullText.Length) { $sFullText.Substring($iSelEnd) } else { "" }
+
+                # Before selection (normal colors)
+                if ($sBeforeSel.Length -gt 0) {
+                    Write-Host $sBeforeSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                }
+
+                if ($this.CursorPosition -eq $iSelStart) {
+                    # Cursor at start of selection: [cursor-char][rest-of-selection]
+                    Write-Host $sSelected[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    if ($sSelected.Length -gt 1) {
+                        Write-Host ($sSelected.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                    # After selection (normal colors)
+                    if ($sAfterSel.Length -gt 0) {
+                        Write-Host $sAfterSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                } else {
+                    # Cursor at end of selection: [selection][cursor]
+                    if ($sSelected.Length -gt 1) {
+                        Write-Host ($sSelected.Substring(0, $sSelected.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                    # Last selected char has cursor highlight
+                    Write-Host $sSelected[$sSelected.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    # After selection (normal colors)
+                    if ($sAfterSel.Length -gt 0) {
+                        Write-Host $sAfterSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                }
+
+                $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length)
+                Write-Host (" " * $iRemaining)
+            } else {
+                # No selection - original rendering logic
+                if ($sFullText.Length -gt 0) {
+                    if (($this.CursorPosition - 1) -ge 0) {
+                        Write-Host ($sFullText.Substring(0, $this.CursorPosition)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                    if (-not $bCursorAtEnd) {
+                        Write-Host $sFullText[$this.CursorPosition] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
+                    }
+                    if ($this.CursorPosition + 1 -lt $sFullText.Length) {
+                        Write-Host ($sFullText.Substring($this.CursorPosition + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                }
+                if ($bCursorAtEnd) {
+                    Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
+                    $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length - 1)
+                } else {
+                    $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length)
+                }
+                Write-Host (" " * $iRemaining)
+            }
+        } else {
+            # === Text overflows: sliding window centered on cursor ===
+            # Position cursor roughly in center of window
+            $iViewStart = $this.CursorPosition - [Math]::Floor($iAvailableWidth / 2)
+            # Clamp
+            if ($iViewStart -lt 0) { $iViewStart = 0 }
+            $iViewEnd = $iViewStart + $iAvailableWidth - $iCursorExtra
+
+            if ($iViewEnd -gt $sFullText.Length) {
+                $iViewEnd = $sFullText.Length
+                $iViewStart = [Math]::Max(0, $iViewEnd - $iAvailableWidth + $iCursorExtra)
+            }
+
+            $bShowLeftArrow = ($iViewStart -gt 0)
+            $bShowRightArrow = ($iViewEnd -lt $sFullText.Length)
+
+            # Adjust for arrow characters
+            if ($bShowLeftArrow) { $iViewStart++ }
+            if ($bShowRightArrow) { $iViewEnd-- }
+
+            # Extract visible portion
+            $sVisibleText = $sFullText.Substring($iViewStart, $iViewEnd - $iViewStart)
+            $iCursorInWindow = $this.CursorPosition - $iViewStart
+
+            # Draw left arrow
+            if ($bShowLeftArrow) {
+                Write-Host ([char]0x25C4) -NoNewline -ForegroundColor DarkYellow -BackgroundColor $this.FocusedTextBackgroundColor
+            }
+
+            # Map selection to window coordinates
+            $iWinSelStart = [Math]::Max(0, $iSelStart - $iViewStart)
+            $iWinSelEnd = [Math]::Min($sVisibleText.Length, $iSelEnd - $iViewStart)
+            $bHasVisibleSelection = $bHasSelection -and ($iWinSelEnd -gt $iWinSelStart)
+
+            if ($bHasVisibleSelection) {
+                # Before selection
+                if ($iWinSelStart -gt 0) {
+                    Write-Host ($sVisibleText.Substring(0, $iWinSelStart)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                }
+
+                $sWinSelected = $sVisibleText.Substring($iWinSelStart, $iWinSelEnd - $iWinSelStart)
+
+                if ($iCursorInWindow -eq $iWinSelStart) {
+                    # Cursor at start of visible selection
+                    Write-Host $sWinSelected[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    if ($sWinSelected.Length -gt 1) {
+                        Write-Host ($sWinSelected.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                    # After selection
+                    if ($iWinSelEnd -lt $sVisibleText.Length) {
+                        Write-Host ($sVisibleText.Substring($iWinSelEnd)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                } else {
+                    # Cursor at end of selection
+                    if ($sWinSelected.Length -gt 1) {
+                        Write-Host ($sWinSelected.Substring(0, $sWinSelected.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                    Write-Host $sWinSelected[$sWinSelected.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    # After selection
+                    if ($iWinSelEnd -lt $sVisibleText.Length) {
+                        Write-Host ($sVisibleText.Substring($iWinSelEnd)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                }
+            } else {
+                # No visible selection - original rendering
+                if ($sVisibleText.Length -gt 0) {
+                    if ($iCursorInWindow -gt 0) {
+                        Write-Host ($sVisibleText.Substring(0, $iCursorInWindow)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                    if ($iCursorInWindow -ge 0 -and $iCursorInWindow -lt $sVisibleText.Length) {
+                        Write-Host $sVisibleText[$iCursorInWindow] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
+                    }
+                    if ($iCursorInWindow + 1 -lt $sVisibleText.Length) {
+                        Write-Host ($sVisibleText.Substring($iCursorInWindow + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                }
+            }
+
+            # Cursor at end of text
+            if ($bCursorAtEnd -and -not $bShowRightArrow) {
+                Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
+            }
+
+            # Draw right arrow
+            if ($bShowRightArrow) {
+                Write-Host ([char]0x25BA) -NoNewline -ForegroundColor DarkYellow -BackgroundColor $this.FocusedTextBackgroundColor
+            }
+
+            Write-Host ""
+        }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressLeft" -Value {
-        if ($this.CursorPosition -eq 0) {
-            return [System.ConsoleKeyInfo]::LeftArrow
+        Param([bool]$Shift = $false)
+        if ($Shift) {
+            if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
+            if ($this.CursorPosition -gt 0) { $this.CursorPosition-- }
         } else {
-            $this.CursorPosition--
+            if ($this.HasSelection()) {
+                $this.CursorPosition = $this.GetSelectionStart()
+                $this.ClearSelection()
+            } elseif ($this.CursorPosition -eq 0) {
+                return [System.ConsoleKeyInfo]::LeftArrow
+            } else {
+                $this.CursorPosition--
+                $this.ClearSelection()
+            }
         }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressRight" -Value {
-        if ($this.CursorPosition -eq $this.Text.Length) {
-            return [System.ConsoleKeyInfo]::RightArrow
+        Param([bool]$Shift = $false)
+        if ($Shift) {
+            if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
+            if ($this.CursorPosition -lt $this.Text.Length) { $this.CursorPosition++ }
         } else {
-            $this.CursorPosition++
+            if ($this.HasSelection()) {
+                $this.CursorPosition = $this.GetSelectionEnd()
+                $this.ClearSelection()
+            } elseif ($this.CursorPosition -eq $this.Text.Length) {
+                return [System.ConsoleKeyInfo]::RightArrow
+            } else {
+                $this.CursorPosition++
+                $this.ClearSelection()
+            }
         }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressBackspace" -Value {
+        if ($this.HasSelection()) {
+            $this.DeleteSelection() | Out-Null
+            return
+        }
         if ($this.CursorPosition -gt 0) {
-            $sPrefix = if ($this.CursorPosition -eq 1) {
+            $sPrefix = if ($this.CursorPosition -le 1) {
                 ""
             } else {
-                $this.Text[0..$($this.CursorPosition - 2)] -join ""
-            } 
-            $sSuffix = $this.Text[$this.CursorPosition..$($this.Text.Length)] -join ""
+                $this.Text.Substring(0, $this.CursorPosition - 1)
+            }
+            $sSuffix = if ($this.CursorPosition -lt $this.Text.Length) {
+                $this.Text.Substring($this.CursorPosition)
+            } else {
+                ""
+            }
             $this.Text = $sPrefix + $sSuffix
             $this.CursorPosition--
         }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressDelete" -Value {
+        if ($this.HasSelection()) {
+            $this.DeleteSelection() | Out-Null
+            return
+        }
         if ($this.CursorPosition -lt $this.Text.Length) {
             $sPrefix = if ($this.CursorPosition -gt 0) {
-                $this.Text[0..$($this.CursorPosition - 1)] -join ""
+                $this.Text.Substring(0, $this.CursorPosition)
             } else {
                 ""
-            } 
-            $sSuffix = $this.Text[($this.CursorPosition + 1)..$($this.Text.Length)] -join ""
+            }
+            $sSuffix = if ($this.CursorPosition + 1 -lt $this.Text.Length) {
+                $this.Text.Substring($this.CursorPosition + 1)
+            } else {
+                ""
+            }
             $this.Text = $sPrefix + $sSuffix
         }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressHome" -Value {
+        Param([bool]$Shift = $false)
+        if ($Shift) {
+            if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
+        } else {
+            $this.ClearSelection()
+        }
         $this.CursorPosition = 0
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressEnd" -Value {
+        Param([bool]$Shift = $false)
+        if ($Shift) {
+            if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
+        } else {
+            $this.ClearSelection()
+        }
         $this.CursorPosition = $this.Text.Length
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressSelectAll" -Value {
+        $this.SelectionAnchor = 0
+        $this.CursorPosition = $this.Text.Length
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressCopy" -Value {
+        if ($this.PasswordChar) { return }
+        if (-not $this.HasSelection()) { return }
+        Set-Clipboard -Value $this.GetSelectedText()
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressPaste" -Value {
+        $sClipboard = Get-Clipboard -ErrorAction SilentlyContinue
+        if (-not $sClipboard) { return }
+        # Flatten to single line
+        $sClipboard = ($sClipboard -join "").Replace("`r", "").Replace("`n", "")
+        # Delete selection first if any
+        $this.DeleteSelection() | Out-Null
+        # Insert at cursor
+        $sPrefix = if ($this.CursorPosition -gt 0) { $this.Text.Substring(0, $this.CursorPosition) } else { "" }
+        $sSuffix = if ($this.CursorPosition -lt $this.Text.Length) { $this.Text.Substring($this.CursorPosition) } else { "" }
+        $this.Text = $sPrefix + $sClipboard + $sSuffix
+        $this.CursorPosition += $sClipboard.Length
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressCut" -Value {
+        if ($this.PasswordChar) { return }
+        if (-not $this.HasSelection()) { return }
+        $this.PressCopy()
+        $this.DeleteSelection() | Out-Null
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressUp" -Value {
@@ -445,14 +745,27 @@
             [System.ConsoleKeyInfo]$KeyInfo
         )
         $this.LastTestedText = $this.Text
+        $bShift = ($KeyInfo.Modifiers -band [System.ConsoleModifiers]::Shift) -eq [System.ConsoleModifiers]::Shift
+        $bCtrl = ($KeyInfo.Modifiers -band [System.ConsoleModifiers]::Control) -eq [System.ConsoleModifiers]::Control
+
         if ([System.Char]::IsControl($KeyInfo.KeyChar)) {
+            # Handle Ctrl+key combinations
+            if ($bCtrl) {
+                switch ($KeyInfo.Key) {
+                    ([System.ConsoleKey]::A) { return $this.PressSelectAll() }
+                    ([System.ConsoleKey]::C) { return $this.PressCopy() }
+                    ([System.ConsoleKey]::V) { return $this.PressPaste() }
+                    ([System.ConsoleKey]::X) { return $this.PressCut() }
+                }
+            }
+
             switch ($KeyInfo.Key) {
-                ([System.ConsoleKey]::LeftArrow) { return $this.PressLeft() }
-                ([System.ConsoleKey]::RightArrow) { return $this.PressRight() }
+                ([System.ConsoleKey]::LeftArrow) { return $this.PressLeft($bShift) }
+                ([System.ConsoleKey]::RightArrow) { return $this.PressRight($bShift) }
                 ([System.ConsoleKey]::UpArrow) { return $this.PressUp() }
                 ([System.ConsoleKey]::DownArrow) { return $this.PressDown() }
-                ([System.ConsoleKey]::Home) { return $this.PressHome() }
-                ([System.ConsoleKey]::End) { return $this.PressEnd() }
+                ([System.ConsoleKey]::Home) { return $this.PressHome($bShift) }
+                ([System.ConsoleKey]::End) { return $this.PressEnd($bShift) }
                 ([System.ConsoleKey]::Backspace) { return $this.PressBackspace() }
                 ([System.ConsoleKey]::Delete) { return $this.PressDelete() }
                 default {
@@ -460,7 +773,9 @@
                 }
             }
         } else {
-            # $press.Character is a real character, not a control character
+            # Regular character input: replace selection if any, then insert
+            $this.DeleteSelection() | Out-Null
+
             if ($this.CursorPosition -eq $this.Text.ToString().Length) {
                 $this.Text += $KeyInfo.KeyChar
                 $this.CursorPosition++
@@ -468,9 +783,13 @@
                 $sPrefix = if ($this.CursorPosition -eq 0) {
                     ""
                 } else {
-                    $this.Text[0..$($this.CursorPosition - 1)] -join ""
+                    $this.Text.Substring(0, $this.CursorPosition)
                 }
-                $sSuffix = $this.Text[$this.CursorPosition..$($this.Text.Length)] -join ""
+                $sSuffix = if ($this.CursorPosition -lt $this.Text.Length) {
+                    $this.Text.Substring($this.CursorPosition)
+                } else {
+                    ""
+                }
                 $this.Text = $sPrefix + $KeyInfo.KeyChar + $sSuffix
                 $this.CursorPosition++
             }
@@ -481,6 +800,7 @@
         Param(
             [int]$Position
         )
+        $this.ClearSelection()
         if ($Position -lt 0) {
             $this.CursorPosition = 0
         } elseif ($Position -gt $this.Text.Length) {
@@ -500,6 +820,7 @@
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "Reset" -Value {
         $this.Text = $this.OriginalText
+        $this.ClearSelection()
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetValue" -Value {
