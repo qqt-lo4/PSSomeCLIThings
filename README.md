@@ -15,7 +15,7 @@ Build interactive CLI dialogs with textboxes, buttons, checkboxes, radio buttons
 | `New-CLIDialogButton` | Creates an interactive button control with support for value selection, action types (Yes, No, Cancel, Exit, Back, etc.), scriptblock execution, and keyboard shortcuts via "&" notation. |
 | `New-CLIDialogCheckBox` | Creates a checkbox control for independent multi-selection. Displays as `[x]`/`[ ]` with keyboard shortcut support and custom object association. |
 | `New-CLIDialogRadioButton` | Creates a radio button control for single selection within a group. Displays as `(x)`/`( )` with automatic mutual exclusion. |
-| `New-CLIDialogTextBox` | Creates an editable text input field with cursor navigation, regex or scriptblock validation, password masking, SecureString support, and visual error feedback. |
+| `New-CLIDialogTextBox` | Creates an editable text input field with cursor navigation, text selection (Shift+Arrows), clipboard support (Ctrl+C/V/X), regex or scriptblock validation, password masking, SecureString support, and visual error feedback. |
 | `New-CLIDialogObjectsRow` | Container row that groups multiple controls in horizontal or vertical layouts with keyboard navigation, labeled headers, and radio button mutual exclusion. |
 | `New-CLIDialogProperty` | Read-only property display element showing labeled information with regex pattern highlighting and aligned layouts. |
 | `New-CLIDialogText` | Text display element supporting static or dynamic content via scriptblock, multi-line text, and custom colors. |
@@ -46,6 +46,13 @@ Build interactive CLI dialogs with textboxes, buttons, checkboxes, radio buttons
 | `Select-CLIFileFromFolder` | File selector from a folder with recursive scanning, manual path entry, and file validation. |
 | `Invoke-CLIDialogWizard` | Manages a succession of dialog steps to build an object progressively, with Back navigation and Exit support. |
 | `New-CLIDialogWizardStep` | Creates a step definition for `Invoke-CLIDialogWizard` with a property name, scriptblock, and optional header. |
+
+#### Theme
+
+| Function | Description |
+|---|---|
+| `Get-CLIDialogTheme` | Retrieves the current dialog theme or a specific color property. Initializes the default theme on first call. Used by all components to resolve default colors. |
+| `Set-CLIDialogTheme` | Sets or resets the global dialog theme. All color parameters have standard defaults; only pass what you want to change. |
 
 ### Menu Builder
 Create interactive navigable menus with sub-menus, actions, and scriptblock execution.
@@ -181,6 +188,7 @@ PSSomeCLIThings/
 │   └── *.ps1                     # High-level dialog functions (14 functions)
 ├── Format/                       # Console formatting utilities (6 functions)
 ├── Menu/                         # Menu builder (5 functions)
+├── Theme/                        # Centralized color theme (2 functions)
 ├── Other/                        # Miscellaneous CLI helpers (7 functions)
 └── String/                       # String formatting utilities (2 functions)
 ```
