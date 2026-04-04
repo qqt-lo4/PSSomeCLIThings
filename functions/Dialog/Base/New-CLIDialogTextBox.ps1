@@ -179,6 +179,8 @@
         - Ctrl+C: Copy selected text to clipboard (disabled for password fields)
         - Ctrl+X: Cut selected text to clipboard (disabled for password fields)
         - Ctrl+V: Paste from clipboard (replaces selection if any)
+        - Ctrl+Up Arrow: Previous value from history
+        - Ctrl+Down Arrow: Next value from history
         - Backspace: Delete character before cursor (or delete selection)
         - Delete: Delete character at cursor (or delete selection)
         - Up/Down Arrow: Navigate between text boxes (returns control to dialog)
@@ -189,6 +191,14 @@
         - Results are cached until text changes
         - Invalid text displays header in ValidationErrorColor
         - Both Regex and ValidationScript are supported (ValidationScript takes precedence)
+
+        HISTORY:
+        - Ctrl+Up/Down navigates through previously validated values
+        - History is stored globally in $Global:CLIDialogHistory, keyed by TextBox Name
+        - Values are saved automatically when dialog is validated (Invoke-CLIDialog)
+        - Password fields are excluded from history
+        - Duplicate consecutive values are not saved
+        - Ctrl+Down from the last entry returns to the text being typed
 
         PASSWORD HANDLING:
         - PasswordChar masks all characters during display
@@ -233,6 +243,11 @@
             - New methods: HasSelection, GetSelectionStart, GetSelectionEnd,
               GetSelectedText, ClearSelection, DeleteSelection, PressSelectAll,
               PressCopy, PressPaste, PressCut
+            - Added input history support (Ctrl+Up/Down)
+            - History stored globally in $Global:CLIDialogHistory, keyed by Name
+            - Values saved on dialog validation, password fields excluded
+            - New properties: HistoryIndex, HistoryCurrentText
+            - New methods: GetHistory, SaveToHistory, PressHistoryUp, PressHistoryDown
 
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
@@ -321,6 +336,8 @@
         PasswordChar = $sPasswordChar
         Name = if ($Name) { $Name } else { "textbox" + $Header.Replace("$([char]27)[4m", "").Replace("$([char]27)[24m", "").Replace(" ", "") }
         ValueConvertFunction = $ValueConvertFunction
+        HistoryIndex = -1
+        HistoryCurrentText = $null
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "IsValidText" -Value {
@@ -724,6 +741,64 @@
         $this.DeleteSelection() | Out-Null
     }
 
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetHistory" -Value {
+        if ($null -eq $Global:CLIDialogHistory) {
+            $Global:CLIDialogHistory = @{}
+        }
+        if ($Global:CLIDialogHistory.ContainsKey($this.Name)) {
+            return ,$Global:CLIDialogHistory[$this.Name]
+        }
+        return ,@()
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "SaveToHistory" -Value {
+        if ($this.PasswordChar) { return }
+        if (-not $this.Text -or $this.Text.Length -eq 0) { return }
+        if ($null -eq $Global:CLIDialogHistory) {
+            $Global:CLIDialogHistory = @{}
+        }
+        if (-not $Global:CLIDialogHistory.ContainsKey($this.Name)) {
+            $Global:CLIDialogHistory[$this.Name] = [System.Collections.ArrayList]@()
+        }
+        $aHistory = $Global:CLIDialogHistory[$this.Name]
+        if ($aHistory.Count -eq 0 -or $aHistory[$aHistory.Count - 1] -ne $this.Text) {
+            $aHistory.Add($this.Text) | Out-Null
+        }
+        $this.HistoryIndex = -1
+        $this.HistoryCurrentText = $null
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressHistoryUp" -Value {
+        $aHistory = $this.GetHistory()
+        if ($aHistory.Count -eq 0) { return }
+        if ($this.HistoryIndex -eq -1) {
+            $this.HistoryCurrentText = $this.Text
+            $this.HistoryIndex = $aHistory.Count - 1
+        } elseif ($this.HistoryIndex -gt 0) {
+            $this.HistoryIndex--
+        } else {
+            return
+        }
+        $this.Text = [string]$aHistory[$this.HistoryIndex]
+        $this.CursorPosition = $this.Text.Length
+        $this.ClearSelection()
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "PressHistoryDown" -Value {
+        if ($this.HistoryIndex -eq -1) { return }
+        $aHistory = $this.GetHistory()
+        if ($this.HistoryIndex -lt $aHistory.Count - 1) {
+            $this.HistoryIndex++
+            $this.Text = [string]$aHistory[$this.HistoryIndex]
+        } else {
+            $this.HistoryIndex = -1
+            $this.Text = [string]$this.HistoryCurrentText
+            $this.HistoryCurrentText = $null
+        }
+        $this.CursorPosition = $this.Text.Length
+        $this.ClearSelection()
+    }
+
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressUp" -Value {
         $hResult = @{
             Key = [System.ConsoleKeyInfo]::new(0, [System.ConsoleKey]::UpArrow, $false, $false, $false)
@@ -756,6 +831,8 @@
                     ([System.ConsoleKey]::C) { return $this.PressCopy() }
                     ([System.ConsoleKey]::V) { return $this.PressPaste() }
                     ([System.ConsoleKey]::X) { return $this.PressCut() }
+                    ([System.ConsoleKey]::UpArrow) { return $this.PressHistoryUp() }
+                    ([System.ConsoleKey]::DownArrow) { return $this.PressHistoryDown() }
                 }
             }
 

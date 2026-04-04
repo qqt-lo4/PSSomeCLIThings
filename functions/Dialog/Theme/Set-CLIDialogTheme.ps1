@@ -86,6 +86,9 @@ function Set-CLIDialogTheme {
         [System.ConsoleColor]$MatchTextForegroundColor = [System.ConsoleColor]::Blue,
         [System.ConsoleColor]$MatchTextBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
         [System.ConsoleColor]$TableHeaderForegroundColor = [System.ConsoleColor]::Green,
+        [System.ConsoleColor]$HintColor = [System.ConsoleColor]::Gray,
+        [System.ConsoleColor]$WarningColor = [System.ConsoleColor]::Yellow,
+        [System.ConsoleColor]$ErrorColor = [System.ConsoleColor]::Red,
         [System.ConsoleColor]$SeparatorColor = [System.ConsoleColor]::Blue
     )
     if (-not ($Global:CLIDialogTheme -is [hashtable])) {
@@ -106,5 +109,8 @@ function Set-CLIDialogTheme {
     $Global:CLIDialogTheme.MatchTextForegroundColor       = $MatchTextForegroundColor
     $Global:CLIDialogTheme.MatchTextBackgroundColor       = $MatchTextBackgroundColor
     $Global:CLIDialogTheme.TableHeaderForegroundColor    = $TableHeaderForegroundColor
+    $Global:CLIDialogTheme.HintColor                     = $HintColor
+    $Global:CLIDialogTheme.WarningColor                  = $WarningColor
+    $Global:CLIDialogTheme.ErrorColor                    = $ErrorColor
     $Global:CLIDialogTheme.SeparatorColor                 = $SeparatorColor
 }

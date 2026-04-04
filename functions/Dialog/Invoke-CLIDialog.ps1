@@ -268,6 +268,14 @@ function Invoke-CLIDialog {
                     Type = $oResult.ButtonType
                     ValidForm = $Dialog.IsValidForm()
                 }
+                # Save textbox history on Validate with valid form
+                if ($oResult.Action -eq "Validate" -and $Dialog.IsValidForm()) {
+                    foreach ($oRow in $Dialog.Rows) {
+                        if ($oRow.Type -eq "textbox") {
+                            $oRow.SaveToHistory()
+                        }
+                    }
+                }
                 switch ($hResult.Type) {
                     { $_ -in @("Action", "Action_Scriptblock") } {
                         if ($hResult.Form.SelectedObjectsArray) {
@@ -360,11 +368,11 @@ function Invoke-CLIDialog {
                     if ($PauseAfterErrorMessage) {
                         Invoke-Pause -ReplaceByLine -LineColor Red -MessageColor White
                     }
-                    $oResult = Show -Dialog $Dialog
+                    $oResult = Show -Dialog $Dialog -DontSpaceAfterDialog:$DontSpaceAfterDialog
                 }
                 return $oResult
             } else {
-                return Show -Dialog $Dialog
+                return Show -Dialog $Dialog -DontSpaceAfterDialog:$DontSpaceAfterDialog
             }
         }
 

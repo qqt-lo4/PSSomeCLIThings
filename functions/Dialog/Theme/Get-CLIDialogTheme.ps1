@@ -51,6 +51,9 @@ function Get-CLIDialogTheme {
         - MatchTextForegroundColor     : Foreground color for pattern-matched text in properties
         - MatchTextBackgroundColor     : Background color for pattern-matched text in properties
         - TableHeaderForegroundColor   : Foreground color for table column headers
+        - HintColor                    : Color for hint/help text
+        - WarningColor                 : Color for warning messages
+        - ErrorColor                   : Color for error messages
         - SeparatorColor               : Foreground color for separator lines
 
         CHANGELOG:

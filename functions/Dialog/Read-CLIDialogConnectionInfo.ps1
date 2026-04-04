@@ -387,9 +387,9 @@ function Read-CLIDialogConnectionInfo {
             $sYesButtonText = "Yes, keep using %s".Replace("%s", $ConnectionInfo.Server) | Set-StringUnderline -Position 0
             $sNoButtonText = "No, enter new connection info" | Set-StringUnderline -Position 0
             $ReuseConnectionInfoQuestion = if ($HeaderAppName -ne $null) {
-                "Connection informations are already in the `$ConnectionInfo variable. Do you want to keem them to connect to $($HeaderAppName)?"
+                "Connection informations are already in the `$ConnectionInfo variable. Do you want to keep them to connect to $($HeaderAppName)?"
             } else {
-                "Connection informations are already in the `$ConnectionInfo variable. Do you want to keem them?"
+                "Connection informations are already in the `$ConnectionInfo variable. Do you want to keep them?"
             }
             $bKeepCred = Invoke-YesNoCLIDialog -Message $ReuseConnectionInfoQuestion -YesButtonText $sYesButtonText -NoButtonText $sNoButtonText -Vertical -SpaceBefore 5
             Write-Host ""

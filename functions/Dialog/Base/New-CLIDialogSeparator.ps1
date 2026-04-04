@@ -148,6 +148,8 @@ function New-CLIDialogSeparator {
         [int]$Length,
         [Parameter(ParameterSetName = "Auto")]
         [switch]$AutoLength,
+        [Parameter(ParameterSetName = "FullWidth")]
+        [switch]$FullWidth,
         [switch]$DrawPageNumber,
         [switch]$DrawArrows,
         [int]$PageNumber,
@@ -178,14 +180,17 @@ function New-CLIDialogSeparator {
         PressKeyToContinueDone = $false
         PressKeyToContinueMessage = $PressKeyToContinueMessage
         Text = $Text
+        AutoLength = $false
+        FullWidth = $false
     }
-    if ($PSCmdlet.ParameterSetName -eq "Length") {
-        $hResult.Length = $Length
-        $hResult.AutoLength = $false
-    } else {
-        if ($AutoLength.IsPresent) {
-            $hResult.AutoLength = $AutoLength
-        } else {
+    switch ($PSCmdlet.ParameterSetName) {
+        "Length" {
+            $hResult.Length = $Length
+        }
+        "FullWidth" {
+            $hResult.FullWidth = $true
+        }
+        default {
             $hResult.AutoLength = $true
         }
     }
@@ -201,7 +206,9 @@ function New-CLIDialogSeparator {
         if ($this.AutoLength -and ($Length -le 0)) {
             throw [System.ArgumentOutOfRangeException] "Can't draw a separator with length equals $Length"
         }
-        $iLength = if ($this.AutoLength) {
+        $iLength = if ($this.FullWidth) {
+            (Get-Host).UI.RawUI.WindowSize.Width - $this.Prefix.Length
+        } elseif ($this.AutoLength) {
             $Length
         } else {
             $this.Length
@@ -222,12 +229,13 @@ function New-CLIDialogSeparator {
             $LineMessage += ($this.Char * $iLength)
             Write-Host $LineMessage -ForegroundColor $this.ForegroundColor
         } else {
-            $sFullLineText = $this.GetFullLineText()
+            $sFullLineText = $this.GetFullLineText($iLength)
             Write-Host $sFullLineText -ForegroundColor $this.ForegroundColor
         }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetFullLineText" -Value {
+        Param([int]$iLength)
         if ((-not $this.DrawPageNumber) -and (-not $this.DrawArrows)) {
             if ($this.Text) {
                 $sLineContent = " " + $this.Text + " " 
@@ -265,8 +273,10 @@ function New-CLIDialogSeparator {
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetTextWidth" -Value {
-        $sFullLineText = $this.GetFullLineText()
-        return $sFullLineText.Length
+        if ($this.AutoLength -or $this.FullWidth) {
+            return 0
+        }
+        return $this.Length + $this.Prefix.Length
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "IsDynamicObject" -Value {

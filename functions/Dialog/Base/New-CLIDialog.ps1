@@ -841,6 +841,14 @@
                 Type = $oResult.ButtonType
                 ValidForm = $this.IsValidForm()
             }
+            # Save textbox history on Validate with valid form
+            if ($oResult.Action -eq "Validate" -and $this.IsValidForm()) {
+                foreach ($oRow in $this.Rows) {
+                    if ($oRow.Type -eq "textbox") {
+                        $oRow.SaveToHistory()
+                    }
+                }
+            }
             switch ($hResult.Type) {
                 { $_ -in @("Action", "Action_Scriptblock") } {
                     return New-DialogResultAction -Action $oResult.Action -DialogResult $hResult -Value $oResult.Object

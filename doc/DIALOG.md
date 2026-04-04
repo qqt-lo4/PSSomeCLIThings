@@ -337,6 +337,17 @@ New-CLIDialogTextBox -Header "Port" -ValidationScript {
 
 > **Note**: If both `Regex` and `ValidationScript` are provided, `Regex` takes precedence.
 
+#### Input History
+
+TextBoxes support input history via `Ctrl+Up/Down`. Previously validated values are stored globally in `$Global:CLIDialogHistory`, keyed by the TextBox's `Name` property.
+
+- Values are saved automatically when the dialog is validated via `Invoke-CLIDialog`
+- Password fields are excluded from history
+- Duplicate consecutive values are not saved
+- `Ctrl+Up`: recall previous value (the text being typed is preserved)
+- `Ctrl+Down`: go to next value, or return to the current text after the last entry
+- History persists across dialogs within the same session — a TextBox with the same `Name` shares its history
+
 #### Keyboard Shortcuts in TextBox
 
 | Key | Action |
@@ -349,6 +360,8 @@ New-CLIDialogTextBox -Header "Port" -ValidationScript {
 | Ctrl+C | Copy selection to clipboard (disabled for password fields) |
 | Ctrl+X | Cut selection to clipboard (disabled for password fields) |
 | Ctrl+V | Paste from clipboard (replaces selection if any) |
+| Ctrl+Up Arrow | Navigate to previous value in input history |
+| Ctrl+Down Arrow | Navigate to next value in input history |
 | Backspace | Delete character before cursor (or delete selection) |
 | Delete | Delete character at cursor (or delete selection) |
 | Any printable character | Insert at cursor position (replaces selection if any) |
@@ -541,6 +554,7 @@ Creates a visual separator line with optional pagination and centered text.
 | `Char` | `string` | `"-"` | Character for the line |
 | `Length` | `int` | — | Fixed length (ParameterSet: `Length`) |
 | `AutoLength` | `switch` | — | Auto-adjust to dialog width (ParameterSet: `Auto`, default) |
+| `FullWidth` | `switch` | — | Use full console window width (ParameterSet: `FullWidth`) |
 | `Text` | `string` | — | Centered text in the separator |
 | `DrawPageNumber` | `switch` | — | Display page numbers |
 | `DrawArrows` | `switch` | — | Display `<--` / `-->` navigation arrows |
@@ -1012,6 +1026,9 @@ $color = Get-CLIDialogTheme "HeaderForegroundColor"
 | `MatchTextForegroundColor` | `Blue` | Property (pattern matches) |
 | `MatchTextBackgroundColor` | Console background | Property (pattern matches) |
 | `TableHeaderForegroundColor` | `Green` | TableItems (column headers) |
+| `HintColor` | `Gray` | Hint/help text (e.g., "You can use * to find more results") |
+| `WarningColor` | `Yellow` | Warning messages (e.g., no results, empty array) |
+| `ErrorColor` | `Red` | Error messages (validation errors, invalid input) |
 | `SeparatorColor` | `Blue` | Separator, Menu |
 
 ### Set-CLIDialogTheme

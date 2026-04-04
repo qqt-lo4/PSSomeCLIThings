@@ -217,7 +217,7 @@
         [switch]$InvisibleHeader,
         [switch]$Vertical
     )
-    $bValid = $true
+    $aUnsupportedTypes = @()
     $aItems = @()
     for ($i = 0; $i -lt $Row.Count; $i++) {
         if ($Row[$i].Type -in @("button", "checkbox", "space", "radiobutton")) {
@@ -225,11 +225,12 @@
                 $aItems += $i
             }
         } else {
-            $bValid = ($Row[$i].Type)
+            $aUnsupportedTypes += $Row[$i].Type
         }
     }
-    if (-not $bValid) {
-        throw "Row contains things that are not supported"
+    if ($aUnsupportedTypes.Count -gt 0) {
+        $sTypes = ($aUnsupportedTypes | Select-Object -Unique) -join ', '
+        throw "Row contains unsupported types: $sTypes"
     }
 
     $hKeyboardObjects = @{}
