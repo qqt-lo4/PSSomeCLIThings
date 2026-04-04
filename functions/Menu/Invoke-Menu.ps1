@@ -43,9 +43,14 @@
             throw "Object is not a menu"
         }
         $aDialogLines = @()
-        $bFullWidth = $Menu.SeparatorWidthMode -eq "FullWidth"
+        $hSeparatorArgs = @{ ForegroundColor = $Menu.SeparatorColor }
+        if ($Menu.SeparatorWidthMode -eq "FullWidth") {
+            $hSeparatorArgs.FullWidth = $true
+        } else {
+            $hSeparatorArgs.AutoLength = $true
+        }
         if ($Menu.Text) {
-            $aDialogLines += New-CLIDialogSeparator -Text ($Menu.Text -replace "&", "") -AutoLength:(-not $bFullWidth) -FullWidth:$bFullWidth -ForegroundColor $Menu.SeparatorColor
+            $aDialogLines += New-CLIDialogSeparator @hSeparatorArgs -Text ($Menu.Text -replace "&", "")
         }
         $iRecommended = 0
         $i = 0
@@ -59,14 +64,14 @@
             $i++
         }
         if ($Menu.OtherMenuItems) {
-            $aDialogLines += New-CLIDialogSeparator -AutoLength:(-not $bFullWidth) -FullWidth:$bFullWidth -ForegroundColor $Menu.SeparatorColor
+            $aDialogLines += New-CLIDialogSeparator @hSeparatorArgs
             foreach ($menuitem in $Menu.OtherMenuItems) {
                 $oNewButton = $menuitem.ConvertToButton()
                 $oNewButton.AddNewLine = $true
                 $aDialogLines += $oNewButton
             }
         }
-        $aDialogLines += New-CLIDialogSeparator -AutoLength:(-not $bFullWidth) -FullWidth:$bFullWidth -ForegroundColor $Menu.SeparatorColor    
+        $aDialogLines += New-CLIDialogSeparator @hSeparatorArgs    
         $oDialog = New-CLIDialog -Rows $aDialogLines
         $oDialog.FocusedRow = $iRecommended
     }
