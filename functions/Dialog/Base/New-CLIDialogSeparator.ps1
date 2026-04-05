@@ -273,7 +273,15 @@ function New-CLIDialogSeparator {
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetTextWidth" -Value {
-        if ($this.AutoLength -or $this.FullWidth) {
+        if ($this.FullWidth) {
+            return 0
+        }
+        if ($this.AutoLength) {
+            # Return minimum width needed to display content
+            if ($this.Text) {
+                # Text + surrounding spaces + at least 1 char separator on each side
+                return (" " + $this.Text + " ").Length + 2 + $this.Prefix.Length
+            }
             return 0
         }
         return $this.Length + $this.Prefix.Length
