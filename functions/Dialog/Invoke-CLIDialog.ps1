@@ -230,7 +230,6 @@ function Invoke-CLIDialog {
         [switch]$DontSpaceAfterDialog
     )
     Begin {
-        # Show delegates to $Dialog._Show() — rendering loop is defined in New-CLIDialog
         function Show {
             Param(
                 [Parameter(Mandatory)]
@@ -240,45 +239,6 @@ function Invoke-CLIDialog {
             return $Dialog._Show([bool]$DontSpaceAfterDialog)
         }
 
-        # Old implementation (before refactoring to _Show):
-        #     $iFormHeight = $Dialog.GetTextHeight($true)
-        #     $Dialog.SetSeparatorLocation()
-        #     $oResult = $null
-        #     $Dialog.DrawStatic()
-        #     $bPreviousTreatCtrlC = [Console]::TreatControlCAsInput
-        #     try {
-        #         [Console]::TreatControlCAsInput = $true
-        #         [console]::CursorVisible=$false
-        #         $Dialog.DrawDynamic()
-        #         While ($oResult -eq $null) {
-        #             $Key = [Console]::ReadKey($true)
-        #             $oResult = $Dialog.PressKey($Key)
-        #             $iOldFormHeight = $iFormHeight
-        #             $iFormHeight = $Dialog.GetTextHeight($true)
-        #             $startPos = [System.Console]::CursorTop - $iOldFormHeight
-        #             [System.Console]::SetCursorPosition(0, $startPos)
-        #             $Dialog.DrawDynamic()
-        #             if ($iFormHeight -lt $iOldFormHeight) {
-        #                 $iWindowWidth = (Get-Host).UI.RawUI.WindowSize.Width
-        #                 for ($g = 0; $g -lt ($iOldFormHeight - $iFormHeight); $g++) {
-        #                     Write-Host (" " * $iWindowWidth)
-        #                 }
-        #             }
-        #         }
-        #     } finally {
-        #         [Console]::TreatControlCAsInput = $bPreviousTreatCtrlC
-        #         $startPos = [System.Console]::CursorTop - $iFormHeight
-        #         [System.Console]::SetCursorPosition(0, $startPos + $iFormHeight) | Out-Null
-        #         [System.Console]::CursorVisible = $true
-        #     }
-        #     if (-not $DontSpaceAfterDialog) { Write-Host "" }
-        #     ... DialogResult construction (now in _Show) ...
-
-        # Old Write-ErrorMessage (before refactoring to $Dialog.WriteErrorMessage()):
-        #     Param($Dialog, $PropertyAlign, $CustomErrorMessage, $ErrorMessageOneField, $ErrorMessageFields, $Details)
-        #     ... error collection and display logic now in New-CLIDialog.WriteErrorMessage() ...
-
-        # Invoke delegates to dialog methods
         function Invoke {
             Param(
                 [Parameter(Mandatory)]
@@ -292,19 +252,6 @@ function Invoke-CLIDialog {
                 return $Dialog.Invoke($true)
             }
         }
-
-        # Old Invoke implementation (before refactoring to dialog methods):
-        #     if ($Validate) {
-        #         $oResult = Show ...
-        #         while ((-not $Dialog.IsValidForm()) -and ...) {
-        #             $Dialog.WriteErrorMessage()
-        #             ...
-        #             $oResult = Show ...
-        #         }
-        #         return $oResult
-        #     } else {
-        #         return Show ...
-        #     }
 
         function Execute {
             Param(
