@@ -34,6 +34,7 @@ Build interactive CLI dialogs with textboxes, buttons, checkboxes, radio buttons
 | `Invoke-YesNoCLIDialog` | Convenience function for Yes/No/Cancel confirmation dialogs with customizable button text, layouts, and keyboard shortcuts. |
 | `Find-Object` | Dynamic interactive search dialog with real-time filtering, paginated results, single/multi-select modes, and confirmation support. |
 | `Edit-Hashtable` | Interactive dialog for editing hashtable values with labeled textboxes for each key-value pair. |
+| `Connect-CLIDialogPSSession` | Connects to a remote computer via PSSession with interactive credential dialog, automatic retry on failure, and credential-aware error handling (clears credentials on authentication errors). |
 | `Read-CLIDialogConnectionInfo` | Prompts for connection information (server, port, username, password) with regex validation and credential reuse support. |
 | `Read-CLIDialogCredential` | Simplified credential prompt (username/password) returning a PSCredential object. Wrapper around Read-CLIDialogConnectionInfo. |
 | `Read-CLIDialogHashtable` | Dynamic form dialog from a hashtable schema with per-field regex validation and optional Cancel button. |

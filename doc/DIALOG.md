@@ -34,6 +34,7 @@ A comprehensive PowerShell framework for building fully interactive CLI dialogs 
   - [Read-CLIDialogIP](#read-clidialogip)
   - [Read-CLIDialogConnectionInfo](#read-clidialogconnectioninfo)
   - [Read-CLIDialogCredential](#read-clidialogcredential)
+  - [Connect-CLIDialogPSSession](#connect-clidialogpssession)
   - [Find-Object](#find-object)
   - [Select-CLIDialogObjectInArray](#select-clidialogobjectinarray)
   - [Select-CLIDialogCSVFile](#select-clidialogcsvfile)
@@ -894,6 +895,43 @@ $cred = Read-CLIDialogCredential -Message "Enter admin credentials:"
 
 $cred = Read-CLIDialogCredential -Credential $existingCred
 # Asks: "Do you want to keep these credentials?"
+```
+
+### Connect-CLIDialogPSSession
+
+Connects to a remote computer via PSSession with an interactive credential dialog. Retries automatically on connection failure and clears credentials on authentication errors.
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `ComputerName` | `string` | *(mandatory)* | Remote computer name |
+| `Credential` | `PSCredential` | — | Existing credential to reuse |
+| `Session` | `PSSession` | — | Existing session (returned immediately if still open to the same computer) |
+| `Message` | `string` | `"Please provide credentials to connect to"` | Credential dialog message |
+| `ErrorMessage` | `string` | `"Connection failed. Please try again."` | Message prefix on failure |
+| `ErrorColor` | `ConsoleColor` | Theme `ErrorColor` | Color for error messages |
+| `AllowCancel` | `switch` | — | Add Cancel button |
+| `AllowBack` | `switch` | — | Add Back button |
+
+#### Returns
+
+- `@{ Credential = [PSCredential]; Session = [PSSession] }` on success
+- `DialogResult.Action.Cancel` if the user cancels
+- `DialogResult.Action.Back` if the user presses Back
+
+#### Error Handling
+
+On authentication-related failures (error codes 5, 1326, 1330), credentials are cleared to force a new prompt. Other errors (network, configuration) keep the credentials for retry.
+
+```powershell
+$result = Connect-CLIDialogPSSession -ComputerName "Server01" -AllowCancel
+if ($result -and $result.PSTypeNames[0] -notlike "DialogResult.Action.*") {
+    Invoke-Command -Session $result.Session -ScriptBlock { hostname }
+}
+
+# With credential reuse
+$result = Connect-CLIDialogPSSession -ComputerName "Server01" -Credential $cred -Session $session
 ```
 
 ### Find-Object
