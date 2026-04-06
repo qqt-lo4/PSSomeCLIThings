@@ -827,27 +827,28 @@
         try {
 			[Console]::TreatControlCAsInput = $true
 			[console]::CursorVisible=$false #prevents cursor flickering
-			$startPos = [System.Console]::CursorTop
 			$this.DrawDynamic()
             While ($oResult -eq $null) {
 				$Key = [Console]::ReadKey($true)
                 $oResult = $this.PressKey($Key)
 
+                $iOldFormHeight = $iFormHeight
+                $iFormHeight = $this.GetTextHeight($true)
+                $startPos = [System.Console]::CursorTop - $iOldFormHeight
                 [System.Console]::SetCursorPosition(0, $startPos)
                 $this.DrawDynamic()
-                $iNewFormHeight = $this.GetTextHeight($true)
                 # Clear ghost lines when height decreased
-                if ($iNewFormHeight -lt $iFormHeight) {
+                if ($iFormHeight -lt $iOldFormHeight) {
                     $iWindowWidth = (Get-Host).UI.RawUI.WindowSize.Width
-                    for ($g = 0; $g -lt ($iFormHeight - $iNewFormHeight); $g++) {
+                    for ($g = 0; $g -lt ($iOldFormHeight - $iFormHeight); $g++) {
                         Write-Host (" " * $iWindowWidth)
                     }
                 }
-                $iFormHeight = $iNewFormHeight
 			}
 		}
 		finally {
 			[Console]::TreatControlCAsInput = $bPreviousTreatCtrlC
+			$startPos = [System.Console]::CursorTop - $iFormHeight
 			[System.Console]::SetCursorPosition(0, $startPos + $iFormHeight) | Out-Null
 			[System.Console]::CursorVisible = $true
 		}
