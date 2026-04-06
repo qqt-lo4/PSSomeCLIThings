@@ -54,6 +54,9 @@ function Get-CLIDialogTheme {
         - HintColor                    : Color for hint/help text
         - WarningColor                 : Color for warning messages
         - ErrorColor                   : Color for error messages
+        - OverflowIndicatorColor       : Color for overflow indicators (◄/►)
+        - OverflowIndicatorLeft        : Left overflow indicator character (default ◄)
+        - OverflowIndicatorRight       : Right overflow indicator character (default ►)
         - SeparatorColor               : Foreground color for separator lines
 
         CHANGELOG:

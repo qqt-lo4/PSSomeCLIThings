@@ -122,11 +122,8 @@ function New-CLIDialogProperty {
         Creates an indented property with yellow header.
 
     .NOTES
-        Module: CLIDialog
         Author: Loïc Ade
-        Created: 2025-10-20
-        Version: 1.0.0
-        Dependencies: Write-ColoredString
+        Version: 1.1.0
 
         This function is part of the CLI Dialog framework. Properties are read-only display
         elements used for showing information to users without allowing interaction.
@@ -155,6 +152,9 @@ function New-CLIDialogProperty {
 
         CHANGELOG:
 
+        Version 1.1.0 - 2026-04-05 - Loïc Ade
+            - Added theme support via Get-CLIDialogTheme for default colors
+
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
             - Read-only property display
@@ -171,12 +171,12 @@ function New-CLIDialogProperty {
         [ValidateSet("Left", "Right")]
         [string]$HeaderAlign = "Left",
         [string]$HeaderSeparator = " : ",
-        [System.ConsoleColor]$TextForegroundColor = (Get-Host).UI.RawUI.ForegroundColor,
-        [System.ConsoleColor]$TextBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$MatchTextForegroundColor = [System.ConsoleColor]::Blue,
-        [System.ConsoleColor]$MatchTextBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$HeaderForegroundColor = [System.ConsoleColor]::Green,
-        [System.ConsoleColor]$HeaderBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
+        [System.ConsoleColor]$TextForegroundColor = (Get-CLIDialogTheme "ForegroundColor"),
+        [System.ConsoleColor]$TextBackgroundColor = (Get-CLIDialogTheme "BackgroundColor"),
+        [System.ConsoleColor]$MatchTextForegroundColor = (Get-CLIDialogTheme "MatchTextForegroundColor"),
+        [System.ConsoleColor]$MatchTextBackgroundColor = (Get-CLIDialogTheme "MatchTextBackgroundColor"),
+        [System.ConsoleColor]$HeaderForegroundColor = (Get-CLIDialogTheme "HeaderForegroundColor"),
+        [System.ConsoleColor]$HeaderBackgroundColor = (Get-CLIDialogTheme "HeaderBackgroundColor"),
         [string]$Pattern,
         [string[]]$ColorGroups = @("0"),
         [switch]$AllMatches,

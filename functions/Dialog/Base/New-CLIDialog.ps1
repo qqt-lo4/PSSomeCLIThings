@@ -461,7 +461,11 @@
             $this.FocusedRow--
             $oRow = $this.Rows[$this.ObjectsIndex[$this.FocusedRow]]
             if (($oRow.type -eq "textbox") -and ($null -ne $Options)) {
-                $oRow.SetCursorPosition($Options)
+                if ($oRow.MultiLine) {
+                    $oRow.SetCursorPositionAtLine(-1, $Options)
+                } else {
+                    $oRow.SetCursorPosition($Options)
+                }
             }
             if (($oRowBefore.type -eq "row") -and ($oRow.type -eq "row")) {
                 $oRowBeforeObjTypes = $oRowBefore.RowContent.type | Select-Object -Unique
@@ -513,7 +517,11 @@
             $this.FocusedRow++
             $oRow = $this.Rows[$this.ObjectsIndex[$this.FocusedRow]]
             if (($oRow.type -eq "textbox") -and ($null -ne $Options)) {
-                $oRow.SetCursorPosition($Options)
+                if ($oRow.MultiLine) {
+                    $oRow.SetCursorPositionAtLine(0, $Options)
+                } else {
+                    $oRow.SetCursorPosition($Options)
+                }
             }
             if (($oRowBefore.type -eq "row") -and ($oRow.type -eq "row")) {
                 $oRowBeforeObjTypes = $oRowBefore.RowContent.type | Select-Object -Unique
@@ -819,14 +827,23 @@
         try {
 			[Console]::TreatControlCAsInput = $true
 			[console]::CursorVisible=$false #prevents cursor flickering
+			$startPos = [System.Console]::CursorTop
 			$this.DrawDynamic()
             While ($oResult -eq $null) {
 				$Key = [Console]::ReadKey($true)
                 $oResult = $this.PressKey($Key)
 
-                $startPos = [System.Console]::CursorTop - $iFormHeight
                 [System.Console]::SetCursorPosition(0, $startPos)
                 $this.DrawDynamic()
+                $iNewFormHeight = $this.GetTextHeight($true)
+                # Clear ghost lines when height decreased
+                if ($iNewFormHeight -lt $iFormHeight) {
+                    $iWindowWidth = (Get-Host).UI.RawUI.WindowSize.Width
+                    for ($g = 0; $g -lt ($iFormHeight - $iNewFormHeight); $g++) {
+                        Write-Host (" " * $iWindowWidth)
+                    }
+                }
+                $iFormHeight = $iNewFormHeight
 			}
 		}
 		finally {

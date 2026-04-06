@@ -244,14 +244,23 @@ function Invoke-CLIDialog {
             try {
                 [Console]::TreatControlCAsInput = $true
                 [console]::CursorVisible=$false #prevents cursor flickering
+                $startPos = [System.Console]::CursorTop
                 $Dialog.DrawDynamic()
                 While ($oResult -eq $null) {
                     $Key = [Console]::ReadKey($true)
                     $oResult = $Dialog.PressKey($Key)
 
-                    $startPos = [System.Console]::CursorTop - $iFormHeight
                     [System.Console]::SetCursorPosition(0, $startPos)
                     $Dialog.DrawDynamic()
+                    $iNewFormHeight = $Dialog.GetTextHeight($true)
+                    # Clear ghost lines when height decreased
+                    if ($iNewFormHeight -lt $iFormHeight) {
+                        $iWindowWidth = (Get-Host).UI.RawUI.WindowSize.Width
+                        for ($g = 0; $g -lt ($iFormHeight - $iNewFormHeight); $g++) {
+                            Write-Host (" " * $iWindowWidth)
+                        }
+                    }
+                    $iFormHeight = $iNewFormHeight
                 }
             } finally {
                 [Console]::TreatControlCAsInput = $bPreviousTreatCtrlC

@@ -138,7 +138,7 @@ function Read-CLIDialogConnectionInfo {
         Uses Autodetect mode with application configuration to determine required fields.
 
     .EXAMPLE
-        $connInfo = Read-CLIDialogConnectionInfo -Server -DefaultServer "localhost" -DefaultPort 8080
+        $connInfo = Read-CLIDialogConnectionInfo -Server -DefaultServer "localhost" -Port -DefaultPort 8080
         # Pre-populates server as "localhost" and port as 8080
 
         Uses Manual mode with default values pre-filled.

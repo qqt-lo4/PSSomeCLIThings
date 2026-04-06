@@ -310,6 +310,10 @@ Creates an editable text input field with cursor navigation, validation, and pas
 | `SeparatorLocation` | `int` | — | Column position for alignment |
 | `Prefix` / `FocusedPrefix` | `string` | — | Prefix before the field (e.g., `"  "` / `"> "`) |
 | `Name` | `string` | `"textbox" + Header` | Unique identifier |
+| `MultiLine` | `switch` | — | Enable multi-line text input mode |
+| `MinVisibleLines` | `int` | `2` | Minimum visible lines in multi-line mode |
+| `MaxVisibleLines` | `int` | `5` | Maximum visible lines in multi-line mode |
+| `MultiLineOverflowMode` | `string` | `"Truncate"` | `"Truncate"` or `"WordWrap"` for multi-line overflow handling |
 
 **Color parameters** (defaults from [theme](#theme)): `TextForegroundColor`, `TextBackgroundColor`, `HeaderForegroundColor`, `HeaderBackgroundColor`, `FocusedTextForegroundColor`, `FocusedTextBackgroundColor`, `FocusedHeaderForegroundColor`, `FocusedHeaderBackgroundColor`, `SelectionForegroundColor`, `SelectionBackgroundColor`, `SelectionCursorBackgroundColor`
 
@@ -348,24 +352,43 @@ TextBoxes support input history via `Ctrl+Up/Down`. Previously validated values 
 - `Ctrl+Down`: go to next value, or return to the current text after the last entry
 - History persists across dialogs within the same session — a TextBox with the same `Name` shares its history
 
+#### Multi-Line Mode
+
+Enable multi-line input with the `-MultiLine` switch. The text area grows dynamically as new lines are added (from `MinVisibleLines` to `MaxVisibleLines`).
+
+```powershell
+# Multi-line text input for DNS names
+New-CLIDialogTextBox -Header "DNS Names" -MultiLine -MaxVisibleLines 5 -Prefix "  " -FocusedPrefix "> "
+```
+
+- **Enter** inserts a new line; the visible area grows up to `MaxVisibleLines`
+- **Up/Down** arrows navigate between lines; at the first/last line, focus passes to the adjacent control
+- **Home/End** move to the start/end of the current line; **Ctrl+Home/End** move to the start/end of the entire text
+- **Ctrl+V** preserves newlines when pasting
+- When lines exceed `MaxVisibleLines`, the viewport scrolls vertically to keep the cursor visible
+- `GetValue()` returns the full text with `\n` as line separator
+
 #### Keyboard Shortcuts in TextBox
 
 | Key | Action |
 |---|---|
-| Left/Right Arrow | Move cursor |
+| Left/Right Arrow | Move cursor (wraps across lines in multi-line mode) |
 | Shift+Left/Right Arrow | Extend selection |
-| Home / End | Jump to start / end |
+| Home / End | Jump to start / end of line (or text in single-line mode) |
+| Ctrl+Home / Ctrl+End | Jump to start / end of entire text (multi-line mode) |
 | Shift+Home / Shift+End | Extend selection to start / end |
 | Ctrl+A | Select all text |
 | Ctrl+C | Copy selection to clipboard (disabled for password fields) |
 | Ctrl+X | Cut selection to clipboard (disabled for password fields) |
-| Ctrl+V | Paste from clipboard (replaces selection if any) |
+| Ctrl+V | Paste from clipboard (preserves newlines in multi-line mode) |
 | Ctrl+Up Arrow | Navigate to previous value in input history |
 | Ctrl+Down Arrow | Navigate to next value in input history |
-| Backspace | Delete character before cursor (or delete selection) |
-| Delete | Delete character at cursor (or delete selection) |
+| Backspace | Delete character before cursor, or join lines in multi-line mode (or delete selection) |
+| Delete | Delete character at cursor, or join lines in multi-line mode (or delete selection) |
+| Enter | Insert new line (multi-line mode only; passed to parent dialog in single-line mode) |
+| Up/Down Arrow | Navigate between lines (multi-line mode); passed to parent dialog at first/last line |
 | Any printable character | Insert at cursor position (replaces selection if any) |
-| Up/Down/Tab/Enter/Escape | Passed to parent dialog |
+| Tab/Escape | Passed to parent dialog |
 
 ---
 
@@ -1029,6 +1052,9 @@ $color = Get-CLIDialogTheme "HeaderForegroundColor"
 | `HintColor` | `Gray` | Hint/help text (e.g., "You can use * to find more results") |
 | `WarningColor` | `Yellow` | Warning messages (e.g., no results, empty array) |
 | `ErrorColor` | `Red` | Error messages (validation errors, invalid input) |
+| `OverflowIndicatorColor` | `DarkYellow` | TextBox (overflow arrow color) |
+| `OverflowIndicatorLeft` | `◄` | TextBox (left overflow character) |
+| `OverflowIndicatorRight` | `►` | TextBox (right overflow character) |
 | `SeparatorColor` | `Blue` | Separator, Menu |
 
 ### Set-CLIDialogTheme

@@ -89,6 +89,9 @@ function Set-CLIDialogTheme {
         [System.ConsoleColor]$HintColor = [System.ConsoleColor]::Gray,
         [System.ConsoleColor]$WarningColor = [System.ConsoleColor]::Yellow,
         [System.ConsoleColor]$ErrorColor = [System.ConsoleColor]::Red,
+        [System.ConsoleColor]$OverflowIndicatorColor = [System.ConsoleColor]::DarkYellow,
+        [string]$OverflowIndicatorLeft = [string][char]0x25C4,
+        [string]$OverflowIndicatorRight = [string][char]0x25BA,
         [System.ConsoleColor]$SeparatorColor = [System.ConsoleColor]::Blue
     )
     if (-not ($Global:CLIDialogTheme -is [hashtable])) {
@@ -112,5 +115,8 @@ function Set-CLIDialogTheme {
     $Global:CLIDialogTheme.HintColor                     = $HintColor
     $Global:CLIDialogTheme.WarningColor                  = $WarningColor
     $Global:CLIDialogTheme.ErrorColor                    = $ErrorColor
+    $Global:CLIDialogTheme.OverflowIndicatorColor          = $OverflowIndicatorColor
+    $Global:CLIDialogTheme.OverflowIndicatorLeft           = $OverflowIndicatorLeft
+    $Global:CLIDialogTheme.OverflowIndicatorRight          = $OverflowIndicatorRight
     $Global:CLIDialogTheme.SeparatorColor                 = $SeparatorColor
 }

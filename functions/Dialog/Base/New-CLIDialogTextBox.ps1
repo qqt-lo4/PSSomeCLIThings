@@ -228,26 +228,41 @@
 
         CHANGELOG:
 
-        Version 2.0.0 - 2026-04-02 - Loïc Ade
+        Version 2.0.0 - 2026-04-05 - Loïc Ade
+            Overflow:
             - Added sliding window for text longer than available width
             - Left/right arrow indicators (◄/►) for overflow direction
             - Cursor-centered viewport with smooth scrolling
             - Overflow indicator in unfocused Draw() method
+            Selection and clipboard:
             - Added text selection support (Shift+Left/Right/Home/End, Ctrl+A)
             - Added clipboard support (Ctrl+C copy, Ctrl+V paste, Ctrl+X cut)
             - Ctrl+C/X disabled for password fields (security)
             - Selection-aware rendering in DrawFocused (fits and overflow modes)
             - Selection-aware editing: typing, Backspace, Delete replace selection
-            - New properties: SelectionAnchor, SelectionForegroundColor,
-              SelectionBackgroundColor, SelectionCursorBackgroundColor
-            - New methods: HasSelection, GetSelectionStart, GetSelectionEnd,
-              GetSelectedText, ClearSelection, DeleteSelection, PressSelectAll,
-              PressCopy, PressPaste, PressCut
+            Input history:
             - Added input history support (Ctrl+Up/Down)
             - History stored globally in $Global:CLIDialogHistory, keyed by Name
             - Values saved on dialog validation, password fields excluded
-            - New properties: HistoryIndex, HistoryCurrentText
-            - New methods: GetHistory, SaveToHistory, PressHistoryUp, PressHistoryDown
+            Multi-line mode:
+            - Added multi-line text input mode (-MultiLine switch)
+            - Dynamic height: grows with content (MinVisibleLines to MaxVisibleLines)
+            - Enter key inserts new lines, Up/Down navigate between lines
+            - Navigation to/from other controls at first/last line boundaries
+            - Home/End navigate within current line, Ctrl+Home/End for entire text
+            - Ctrl+V preserves newlines in multi-line mode
+            - Vertical scrolling with viewport when lines exceed MaxVisibleLines
+            New parameters: MultiLine, MinVisibleLines, MaxVisibleLines,
+              MultiLineOverflowMode, SelectionForegroundColor,
+              SelectionBackgroundColor, SelectionCursorBackgroundColor
+            New properties: SelectionAnchor, HistoryIndex, HistoryCurrentText,
+              ViewportTopLine
+            New methods: HasSelection, GetSelectionStart, GetSelectionEnd,
+              GetSelectedText, ClearSelection, DeleteSelection, PressSelectAll,
+              PressCopy, PressPaste, PressCut, GetHistory, SaveToHistory,
+              PressHistoryUp, PressHistoryDown, GetLines, GetCursorLineColumn,
+              GetFlatPosition, GetCurrentVisibleLineCount, EnsureCursorVisible,
+              SetCursorPositionAtLine, DrawLine, DrawFocusedLineContent
 
         Version 1.0.0 - 2025-10-20 - Loïc Ade
             - Initial release
@@ -267,29 +282,37 @@
         [ValidateSet("Left", "Right")]
         [string]$HeaderAlign = "Left",
         [string]$HeaderSeparator = " : ",
-        [System.ConsoleColor]$TextForegroundColor = (Get-Host).UI.RawUI.ForegroundColor,
-        [System.ConsoleColor]$TextBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$HeaderForegroundColor = [System.ConsoleColor]::Green,
-        [System.ConsoleColor]$HeaderBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$FocusedTextForegroundColor = (Get-Host).UI.RawUI.ForegroundColor,
-        [System.ConsoleColor]$FocusedTextBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$FocusedHeaderForegroundColor = [System.ConsoleColor]::Blue,
-        [System.ConsoleColor]$FocusedHeaderBackgroundColor = (Get-Host).UI.RawUI.BackgroundColor,
+        [System.ConsoleColor]$TextForegroundColor = (Get-CLIDialogTheme "ForegroundColor"),
+        [System.ConsoleColor]$TextBackgroundColor = (Get-CLIDialogTheme "BackgroundColor"),
+        [System.ConsoleColor]$HeaderForegroundColor = (Get-CLIDialogTheme "HeaderForegroundColor"),
+        [System.ConsoleColor]$HeaderBackgroundColor = (Get-CLIDialogTheme "HeaderBackgroundColor"),
+        [System.ConsoleColor]$FocusedTextForegroundColor = (Get-CLIDialogTheme "ForegroundColor"),
+        [System.ConsoleColor]$FocusedTextBackgroundColor = (Get-CLIDialogTheme "BackgroundColor"),
+        [System.ConsoleColor]$FocusedHeaderForegroundColor = (Get-CLIDialogTheme "FocusedHeaderForegroundColor"),
+        [System.ConsoleColor]$FocusedHeaderBackgroundColor = (Get-CLIDialogTheme "FocusedHeaderBackgroundColor"),
         [int]$SeparatorLocation,
         [object]$Text = "",
         [string]$Prefix,
         [string]$FocusedPrefix,
         [string]$Regex,
         [object]$ValidationScript,
-        [System.ConsoleColor]$SelectionForegroundColor = (Get-Host).UI.RawUI.BackgroundColor,
-        [System.ConsoleColor]$SelectionBackgroundColor = [System.ConsoleColor]::DarkCyan,
-        [System.ConsoleColor]$SelectionCursorBackgroundColor = [System.ConsoleColor]::Blue,
-        [System.ConsoleColor]$ValidationErrorColor = [System.ConsoleColor]::Red,
+        [System.ConsoleColor]$SelectionForegroundColor = (Get-CLIDialogTheme "SelectionForegroundColor"),
+        [System.ConsoleColor]$SelectionBackgroundColor = (Get-CLIDialogTheme "SelectionBackgroundColor"),
+        [System.ConsoleColor]$SelectionCursorBackgroundColor = (Get-CLIDialogTheme "SelectionCursorBackgroundColor"),
+        [System.ConsoleColor]$OverflowIndicatorColor = (Get-CLIDialogTheme "OverflowIndicatorColor"),
+        [string]$OverflowIndicatorLeft = (Get-CLIDialogTheme "OverflowIndicatorLeft"),
+        [string]$OverflowIndicatorRight = (Get-CLIDialogTheme "OverflowIndicatorRight"),
+        [System.ConsoleColor]$ValidationErrorColor = (Get-CLIDialogTheme "ValidationErrorColor"),
         [string]$ValidationErrorReason,
         [string]$FieldNameInErrorReason,
         [char]$PasswordChar,
         [string]$Name,
-        [object]$ValueConvertFunction
+        [object]$ValueConvertFunction,
+        [switch]$MultiLine,
+        [int]$MinVisibleLines = 1,
+        [int]$MaxVisibleLines = 5,
+        [ValidateSet("Truncate", "WordWrap")]
+        [string]$MultiLineOverflowMode = "Truncate"
     )
     $sText, $sPasswordChar = if (($Text -is [string]) -or ($Text -is [int])) {
         $sTextResult = $Text.ToString()
@@ -327,6 +350,9 @@
         SelectionForegroundColor = $SelectionForegroundColor
         SelectionBackgroundColor = $SelectionBackgroundColor
         SelectionCursorBackgroundColor = $SelectionCursorBackgroundColor
+        OverflowIndicatorColor = $OverflowIndicatorColor
+        OverflowIndicatorLeft = $OverflowIndicatorLeft
+        OverflowIndicatorRight = $OverflowIndicatorRight
         Regex = $Regex
         ValidationScript = $ValidationScript
         ValidationErrorColor = $ValidationErrorColor
@@ -338,6 +364,55 @@
         ValueConvertFunction = $ValueConvertFunction
         HistoryIndex = -1
         HistoryCurrentText = $null
+        MultiLine = [bool]$MultiLine
+        MinVisibleLines = if ($MultiLine) { [Math]::Max($MinVisibleLines, 2) } else { 1 }
+        MaxVisibleLines = if ($MultiLine) { $MaxVisibleLines } else { 1 }
+        MultiLineOverflowMode = $MultiLineOverflowMode
+        ViewportTopLine = 0
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetLines" -Value {
+        return ,$this.Text.Split("`n")
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetCursorLineColumn" -Value {
+        $aLines = $this.GetLines()
+        $iPos = 0
+        for ($i = 0; $i -lt $aLines.Count; $i++) {
+            if ($this.CursorPosition -le ($iPos + $aLines[$i].Length)) {
+                return @{ Line = $i; Column = $this.CursorPosition - $iPos }
+            }
+            $iPos += $aLines[$i].Length + 1
+        }
+        $iLast = $aLines.Count - 1
+        return @{ Line = $iLast; Column = $aLines[$iLast].Length }
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetFlatPosition" -Value {
+        Param([int]$Line, [int]$Column)
+        $aLines = $this.GetLines()
+        $iPos = 0
+        for ($i = 0; $i -lt $Line; $i++) {
+            $iPos += $aLines[$i].Length + 1
+        }
+        return $iPos + [Math]::Min($Column, $aLines[$Line].Length)
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "GetCurrentVisibleLineCount" -Value {
+        if (-not $this.MultiLine) { return 1 }
+        $iLineCount = $this.GetLines().Count
+        return [Math]::Max($this.MinVisibleLines, [Math]::Min($iLineCount, $this.MaxVisibleLines))
+    }
+
+    $hResult | Add-Member -MemberType ScriptMethod -Name "EnsureCursorVisible" -Value {
+        if (-not $this.MultiLine) { return }
+        $iCursorLine = $this.GetCursorLineColumn().Line
+        $iVisibleLines = $this.GetCurrentVisibleLineCount()
+        if ($iCursorLine -lt $this.ViewportTopLine) {
+            $this.ViewportTopLine = $iCursorLine
+        } elseif ($iCursorLine -ge ($this.ViewportTopLine + $iVisibleLines)) {
+            $this.ViewportTopLine = $iCursorLine - $iVisibleLines + 1
+        }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "IsValidText" -Value {
@@ -410,6 +485,23 @@
         return $true
     }
 
+    $hResult | Add-Member -MemberType ScriptMethod -Name "DrawLine" -Value {
+        Param([string]$LineText, [int]$AvailableWidth, [string]$HeaderText, [System.ConsoleColor]$HeaderFG, [System.ConsoleColor]$HeaderBG)
+        if ($HeaderText) {
+            Write-Host $HeaderText -ForegroundColor $HeaderFG -BackgroundColor $HeaderBG -NoNewline
+        }
+        $sPrintedLine = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $LineText.Length } else { $LineText }
+        if ($sPrintedLine.Length -gt $AvailableWidth -and $AvailableWidth -gt 2) {
+            $sVisible = $sPrintedLine.Substring(0, $AvailableWidth - 1)
+            Write-Host $sVisible -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
+            Write-Host $this.OverflowIndicatorRight -ForegroundColor $this.OverflowIndicatorColor -BackgroundColor $this.TextBackgroundColor
+        } else {
+            Write-Host $sPrintedLine -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
+            $iRemaining = [Math]::Max(0, $AvailableWidth - $sPrintedLine.Length)
+            Write-Host (" " * $iRemaining)
+        }
+    }
+
     $hResult | Add-Member -MemberType ScriptMethod -Name "Draw" -Value {
         $iAlign = if ($this.HeaderAlign -eq "Left") { -1 } else { 1 }
         $sHeader = ("" + $this.Prefix + ("{0,$($this.SeparatorLocation * $iAlign)}" -f $this.Header) + $this.HeaderSeparator)
@@ -418,19 +510,155 @@
         } else {
             $this.ValidationErrorColor
         }
-        Write-Host $sHeader -ForegroundColor $oHeaderColor -BackgroundColor $this.HeaderBackgroundColor -NoNewline
-        $sPrintedText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
-
         $iAvailableWidth = $host.ui.RawUI.WindowSize.Width - $sHeader.Length
-        if ($sPrintedText.Length -gt $iAvailableWidth -and $iAvailableWidth -gt 2) {
-            # Text overflows: show the beginning with ► at the end
-            $sVisible = $sPrintedText.Substring(0, $iAvailableWidth - 1)
-            Write-Host $sVisible -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
-            Write-Host ([char]0x25BA) -ForegroundColor DarkYellow -BackgroundColor $this.TextBackgroundColor
+        if ($this.MultiLine) {
+            $aLines = $this.GetLines()
+            $sLinePadding = " " * $sHeader.Length
+            $iVisibleLines = $this.GetCurrentVisibleLineCount()
+            for ($i = 0; $i -lt $iVisibleLines; $i++) {
+                $iLineIndex = $this.ViewportTopLine + $i
+                $sLineText = if ($iLineIndex -lt $aLines.Count) { [string]$aLines[$iLineIndex] } else { "" }
+                $sLineHeader = if ($i -eq 0) { $sHeader } else { $sLinePadding }
+                $oLineFG = if ($i -eq 0) { $oHeaderColor } else { $this.HeaderBackgroundColor }
+                $this.DrawLine($sLineText, $iAvailableWidth, $sLineHeader, $oLineFG, $this.HeaderBackgroundColor)
+            }
         } else {
-            Write-Host $sPrintedText -ForegroundColor $this.TextForegroundColor -BackgroundColor $this.TextBackgroundColor -NoNewline
-            $iRemaining = [Math]::Max(0, $iAvailableWidth - $sPrintedText.Length)
+            $sPrintedText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
+            $this.DrawLine($sPrintedText, $iAvailableWidth, $sHeader, $oHeaderColor, $this.HeaderBackgroundColor)
+        }
+    }
+
+    # Renders a single line of text with cursor and selection support
+    $hResult | Add-Member -MemberType ScriptMethod -Name "DrawFocusedLineContent" -Value {
+        Param([string]$sFullText, [int]$iAvailableWidth, [int]$iCursorPos, [bool]$bShowCursor, [int]$iSelStart, [int]$iSelEnd, [bool]$bHasSelection)
+        $bCursorAtEnd = $bShowCursor -and ($iCursorPos -eq $sFullText.Length)
+        $iCursorExtra = if ($bCursorAtEnd) { 1 } else { 0 }
+
+        if (($sFullText.Length + $iCursorExtra) -le $iAvailableWidth) {
+            # === Text fits entirely ===
+            if ($bHasSelection -and ($iSelEnd -gt $iSelStart)) {
+                # Clamp selection to this line
+                $iLS = [Math]::Max(0, $iSelStart)
+                $iLE = [Math]::Min($sFullText.Length, $iSelEnd)
+                if ($iLE -gt $iLS) {
+                    $sBeforeSel = if ($iLS -gt 0) { $sFullText.Substring(0, $iLS) } else { "" }
+                    $sSelected = $sFullText.Substring($iLS, $iLE - $iLS)
+                    $sAfterSel = if ($iLE -lt $sFullText.Length) { $sFullText.Substring($iLE) } else { "" }
+
+                    if ($sBeforeSel.Length -gt 0) {
+                        Write-Host $sBeforeSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                    if ($bShowCursor -and $iCursorPos -eq $iLS) {
+                        Write-Host $sSelected[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                        if ($sSelected.Length -gt 1) {
+                            Write-Host ($sSelected.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                        }
+                    } elseif ($bShowCursor -and $iCursorPos -eq $iLE) {
+                        if ($sSelected.Length -gt 1) {
+                            Write-Host ($sSelected.Substring(0, $sSelected.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                        }
+                        Write-Host $sSelected[$sSelected.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    } else {
+                        Write-Host $sSelected -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                    if ($bCursorAtEnd) {
+                        Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
+                        $sAfterSel = ""
+                    }
+                    if ($sAfterSel.Length -gt 0) {
+                        Write-Host $sAfterSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                } else {
+                    # Selection doesn't intersect this line
+                    $this.DrawFocusedLineContent($sFullText, $iAvailableWidth, $iCursorPos, $bShowCursor, 0, 0, $false)
+                    return
+                }
+            } else {
+                # No selection
+                if ($sFullText.Length -gt 0) {
+                    if ($bShowCursor -and ($iCursorPos -ge 1)) {
+                        Write-Host ($sFullText.Substring(0, $iCursorPos)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    } elseif (-not $bShowCursor) {
+                        Write-Host $sFullText -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                    if ($bShowCursor -and -not $bCursorAtEnd) {
+                        Write-Host $sFullText[$iCursorPos] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
+                    }
+                    if ($bShowCursor -and ($iCursorPos + 1 -lt $sFullText.Length)) {
+                        Write-Host ($sFullText.Substring($iCursorPos + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                    }
+                }
+                if ($bCursorAtEnd) {
+                    Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
+                }
+            }
+            if ($bCursorAtEnd) {
+                $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length - 1)
+            } else {
+                $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length)
+            }
             Write-Host (" " * $iRemaining)
+        } else {
+            # === Text overflows: sliding window ===
+            $iLocalCursor = if ($bShowCursor) { $iCursorPos } else { 0 }
+            $iViewStart = $iLocalCursor - [Math]::Floor($iAvailableWidth / 2)
+            if ($iViewStart -lt 0) { $iViewStart = 0 }
+            $iViewEnd = $iViewStart + $iAvailableWidth - $iCursorExtra
+            if ($iViewEnd -gt $sFullText.Length) {
+                $iViewEnd = $sFullText.Length
+                $iViewStart = [Math]::Max(0, $iViewEnd - $iAvailableWidth + $iCursorExtra)
+            }
+            $bShowLeftArrow = ($iViewStart -gt 0)
+            $bShowRightArrow = ($iViewEnd -lt $sFullText.Length)
+            if ($bShowLeftArrow) { $iViewStart++ }
+            if ($bShowRightArrow) { $iViewEnd-- }
+            $sVisibleText = $sFullText.Substring($iViewStart, $iViewEnd - $iViewStart)
+            $iCursorInWindow = $iLocalCursor - $iViewStart
+
+            if ($bShowLeftArrow) {
+                Write-Host $this.OverflowIndicatorLeft -NoNewline -ForegroundColor $this.OverflowIndicatorColor -BackgroundColor $this.FocusedTextBackgroundColor
+            }
+
+            $iWinSelStart = [Math]::Max(0, $iSelStart - $iViewStart)
+            $iWinSelEnd = [Math]::Min($sVisibleText.Length, $iSelEnd - $iViewStart)
+            $bHasVisibleSel = $bHasSelection -and ($iWinSelEnd -gt $iWinSelStart)
+
+            if ($bHasVisibleSel) {
+                if ($iWinSelStart -gt 0) {
+                    Write-Host ($sVisibleText.Substring(0, $iWinSelStart)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                }
+                $sWinSel = $sVisibleText.Substring($iWinSelStart, $iWinSelEnd - $iWinSelStart)
+                if ($bShowCursor -and $iCursorInWindow -eq $iWinSelStart) {
+                    Write-Host $sWinSel[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    if ($sWinSel.Length -gt 1) { Write-Host ($sWinSel.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor }
+                } else {
+                    if ($sWinSel.Length -gt 1) { Write-Host ($sWinSel.Substring(0, $sWinSel.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor }
+                    if ($bShowCursor -and $iCursorInWindow -eq $iWinSelEnd) {
+                        Write-Host $sWinSel[$sWinSel.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
+                    } else {
+                        Write-Host $sWinSel[$sWinSel.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
+                    }
+                }
+                if ($iWinSelEnd -lt $sVisibleText.Length) {
+                    Write-Host ($sVisibleText.Substring($iWinSelEnd)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
+                }
+            } else {
+                if ($sVisibleText.Length -gt 0) {
+                    if ($bShowCursor -and $iCursorInWindow -gt 0) { Write-Host ($sVisibleText.Substring(0, $iCursorInWindow)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor }
+                    elseif (-not $bShowCursor) { Write-Host $sVisibleText -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor }
+                    if ($bShowCursor -and $iCursorInWindow -ge 0 -and $iCursorInWindow -lt $sVisibleText.Length) {
+                        Write-Host $sVisibleText[$iCursorInWindow] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
+                    }
+                    if ($bShowCursor -and $iCursorInWindow + 1 -lt $sVisibleText.Length) { Write-Host ($sVisibleText.Substring($iCursorInWindow + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor }
+                }
+            }
+            if ($bCursorAtEnd -and -not $bShowRightArrow) {
+                Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
+            }
+            if ($bShowRightArrow) {
+                Write-Host $this.OverflowIndicatorRight -NoNewline -ForegroundColor $this.OverflowIndicatorColor -BackgroundColor $this.FocusedTextBackgroundColor
+            }
+            Write-Host ""
         }
     }
 
@@ -443,172 +671,55 @@
         } else {
             $this.ValidationErrorColor
         }
-        Write-Host $sPropertyToScreen -NoNewline -ForegroundColor $oHeaderColor -BackgroundColor $this.FocusedHeaderBackgroundColor
 
         # Clamp cursor position
         if ($this.CursorPosition -lt 0) { $this.CursorPosition = 0 }
         elseif ($this.CursorPosition -gt $this.Text.Length) { $this.CursorPosition = $this.Text.Length }
 
-        # Prepare display text (with password masking)
-        $sFullText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
-
-        # Available width for text area (1 extra for cursor block at end)
         $iAvailableWidth = $host.ui.RawUI.WindowSize.Width - $sPropertyToScreen.Length
-        $bCursorAtEnd = ($this.CursorPosition -eq $this.Text.Length)
-        $iCursorExtra = if ($bCursorAtEnd) { 1 } else { 0 }
-
-        # Selection bounds
         $bHasSelection = $this.HasSelection()
         $iSelStart = $this.GetSelectionStart()
         $iSelEnd = $this.GetSelectionEnd()
 
-        if (($sFullText.Length + $iCursorExtra) -le $iAvailableWidth) {
-            # === Text fits entirely ===
-            if ($bHasSelection) {
-                $sBeforeSel = if ($iSelStart -gt 0) { $sFullText.Substring(0, $iSelStart) } else { "" }
-                $sSelected = $sFullText.Substring($iSelStart, $iSelEnd - $iSelStart)
-                $sAfterSel = if ($iSelEnd -lt $sFullText.Length) { $sFullText.Substring($iSelEnd) } else { "" }
-
-                # Before selection (normal colors)
-                if ($sBeforeSel.Length -gt 0) {
-                    Write-Host $sBeforeSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                }
-
-                if ($this.CursorPosition -eq $iSelStart) {
-                    # Cursor at start of selection: [cursor-char][rest-of-selection]
-                    Write-Host $sSelected[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
-                    if ($sSelected.Length -gt 1) {
-                        Write-Host ($sSelected.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
-                    }
-                    # After selection (normal colors)
-                    if ($sAfterSel.Length -gt 0) {
-                        Write-Host $sAfterSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
+        if ($this.MultiLine) {
+            $aLines = $this.GetLines()
+            $sLinePadding = " " * $sPropertyToScreen.Length
+            $oCursor = $this.GetCursorLineColumn()
+            $iVisibleLines = $this.GetCurrentVisibleLineCount()
+            $iFlatPos = 0
+            # Calculate flat position of ViewportTopLine
+            for ($j = 0; $j -lt $this.ViewportTopLine; $j++) {
+                $iFlatPos += $aLines[$j].Length + 1
+            }
+            for ($i = 0; $i -lt $iVisibleLines; $i++) {
+                $iLineIndex = $this.ViewportTopLine + $i
+                # Header or padding
+                if ($i -eq 0) {
+                    Write-Host $sPropertyToScreen -NoNewline -ForegroundColor $oHeaderColor -BackgroundColor $this.FocusedHeaderBackgroundColor
                 } else {
-                    # Cursor at end of selection: [selection][cursor]
-                    if ($sSelected.Length -gt 1) {
-                        Write-Host ($sSelected.Substring(0, $sSelected.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
-                    }
-                    # Last selected char has cursor highlight
-                    Write-Host $sSelected[$sSelected.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
-                    # After selection (normal colors)
-                    if ($sAfterSel.Length -gt 0) {
-                        Write-Host $sAfterSel -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
+                    Write-Host $sLinePadding -NoNewline
                 }
-
-                $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length)
-                Write-Host (" " * $iRemaining)
-            } else {
-                # No selection - original rendering logic
-                if ($sFullText.Length -gt 0) {
-                    if (($this.CursorPosition - 1) -ge 0) {
-                        Write-Host ($sFullText.Substring(0, $this.CursorPosition)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                    if (-not $bCursorAtEnd) {
-                        Write-Host $sFullText[$this.CursorPosition] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
-                    }
-                    if ($this.CursorPosition + 1 -lt $sFullText.Length) {
-                        Write-Host ($sFullText.Substring($this.CursorPosition + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                }
-                if ($bCursorAtEnd) {
-                    Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
-                    $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length - 1)
+                if ($iLineIndex -lt $aLines.Count) {
+                    $sLine = [string]$aLines[$iLineIndex]
+                    $bCursorOnThisLine = ($iLineIndex -eq $oCursor.Line)
+                    $iLineCursorPos = if ($bCursorOnThisLine) { $oCursor.Column } else { 0 }
+                    # Map selection to line-local coordinates
+                    $iLineSelStart = [Math]::Max(0, $iSelStart - $iFlatPos)
+                    $iLineSelEnd = [Math]::Min($sLine.Length, $iSelEnd - $iFlatPos)
+                    $bLineSel = $bHasSelection -and ($iLineSelEnd -gt $iLineSelStart)
+                    $this.DrawFocusedLineContent($sLine, $iAvailableWidth, $iLineCursorPos, $bCursorOnThisLine, $iLineSelStart, $iLineSelEnd, $bLineSel)
                 } else {
-                    $iRemaining = [Math]::Max(0, $iAvailableWidth - $sFullText.Length)
+                    # Empty padding line
+                    Write-Host (" " * $iAvailableWidth)
                 }
-                Write-Host (" " * $iRemaining)
+                if ($iLineIndex -lt $aLines.Count) {
+                    $iFlatPos += $aLines[$iLineIndex].Length + 1
+                }
             }
         } else {
-            # === Text overflows: sliding window centered on cursor ===
-            # Position cursor roughly in center of window
-            $iViewStart = $this.CursorPosition - [Math]::Floor($iAvailableWidth / 2)
-            # Clamp
-            if ($iViewStart -lt 0) { $iViewStart = 0 }
-            $iViewEnd = $iViewStart + $iAvailableWidth - $iCursorExtra
-
-            if ($iViewEnd -gt $sFullText.Length) {
-                $iViewEnd = $sFullText.Length
-                $iViewStart = [Math]::Max(0, $iViewEnd - $iAvailableWidth + $iCursorExtra)
-            }
-
-            $bShowLeftArrow = ($iViewStart -gt 0)
-            $bShowRightArrow = ($iViewEnd -lt $sFullText.Length)
-
-            # Adjust for arrow characters
-            if ($bShowLeftArrow) { $iViewStart++ }
-            if ($bShowRightArrow) { $iViewEnd-- }
-
-            # Extract visible portion
-            $sVisibleText = $sFullText.Substring($iViewStart, $iViewEnd - $iViewStart)
-            $iCursorInWindow = $this.CursorPosition - $iViewStart
-
-            # Draw left arrow
-            if ($bShowLeftArrow) {
-                Write-Host ([char]0x25C4) -NoNewline -ForegroundColor DarkYellow -BackgroundColor $this.FocusedTextBackgroundColor
-            }
-
-            # Map selection to window coordinates
-            $iWinSelStart = [Math]::Max(0, $iSelStart - $iViewStart)
-            $iWinSelEnd = [Math]::Min($sVisibleText.Length, $iSelEnd - $iViewStart)
-            $bHasVisibleSelection = $bHasSelection -and ($iWinSelEnd -gt $iWinSelStart)
-
-            if ($bHasVisibleSelection) {
-                # Before selection
-                if ($iWinSelStart -gt 0) {
-                    Write-Host ($sVisibleText.Substring(0, $iWinSelStart)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                }
-
-                $sWinSelected = $sVisibleText.Substring($iWinSelStart, $iWinSelEnd - $iWinSelStart)
-
-                if ($iCursorInWindow -eq $iWinSelStart) {
-                    # Cursor at start of visible selection
-                    Write-Host $sWinSelected[0] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
-                    if ($sWinSelected.Length -gt 1) {
-                        Write-Host ($sWinSelected.Substring(1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
-                    }
-                    # After selection
-                    if ($iWinSelEnd -lt $sVisibleText.Length) {
-                        Write-Host ($sVisibleText.Substring($iWinSelEnd)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                } else {
-                    # Cursor at end of selection
-                    if ($sWinSelected.Length -gt 1) {
-                        Write-Host ($sWinSelected.Substring(0, $sWinSelected.Length - 1)) -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionBackgroundColor
-                    }
-                    Write-Host $sWinSelected[$sWinSelected.Length - 1] -NoNewline -ForegroundColor $this.SelectionForegroundColor -BackgroundColor $this.SelectionCursorBackgroundColor
-                    # After selection
-                    if ($iWinSelEnd -lt $sVisibleText.Length) {
-                        Write-Host ($sVisibleText.Substring($iWinSelEnd)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                }
-            } else {
-                # No visible selection - original rendering
-                if ($sVisibleText.Length -gt 0) {
-                    if ($iCursorInWindow -gt 0) {
-                        Write-Host ($sVisibleText.Substring(0, $iCursorInWindow)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                    if ($iCursorInWindow -ge 0 -and $iCursorInWindow -lt $sVisibleText.Length) {
-                        Write-Host $sVisibleText[$iCursorInWindow] -NoNewline -ForegroundColor $this.FocusedTextBackgroundColor -BackgroundColor $this.FocusedTextForegroundColor
-                    }
-                    if ($iCursorInWindow + 1 -lt $sVisibleText.Length) {
-                        Write-Host ($sVisibleText.Substring($iCursorInWindow + 1)) -NoNewline -ForegroundColor $this.FocusedTextForegroundColor -BackgroundColor $this.FocusedTextBackgroundColor
-                    }
-                }
-            }
-
-            # Cursor at end of text
-            if ($bCursorAtEnd -and -not $bShowRightArrow) {
-                Write-Host " " -ForegroundColor Black -BackgroundColor White -NoNewline
-            }
-
-            # Draw right arrow
-            if ($bShowRightArrow) {
-                Write-Host ([char]0x25BA) -NoNewline -ForegroundColor DarkYellow -BackgroundColor $this.FocusedTextBackgroundColor
-            }
-
-            Write-Host ""
+            Write-Host $sPropertyToScreen -NoNewline -ForegroundColor $oHeaderColor -BackgroundColor $this.FocusedHeaderBackgroundColor
+            $sFullText = if ($this.PasswordChar) { $this.PasswordChar.ToString() * $this.Text.Length } else { $this.Text }
+            $this.DrawFocusedLineContent($sFullText, $iAvailableWidth, $this.CursorPosition, $true, $iSelStart, $iSelEnd, $bHasSelection)
         }
     }
 
@@ -651,6 +762,7 @@
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressBackspace" -Value {
         if ($this.HasSelection()) {
             $this.DeleteSelection() | Out-Null
+            if ($this.MultiLine) { $this.EnsureCursorVisible() }
             return
         }
         if ($this.CursorPosition -gt 0) {
@@ -666,6 +778,7 @@
             }
             $this.Text = $sPrefix + $sSuffix
             $this.CursorPosition--
+            if ($this.MultiLine) { $this.EnsureCursorVisible() }
         }
     }
 
@@ -690,23 +803,34 @@
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressHome" -Value {
-        Param([bool]$Shift = $false)
+        Param([bool]$Shift = $false, [bool]$Ctrl = $false)
         if ($Shift) {
             if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
         } else {
             $this.ClearSelection()
         }
-        $this.CursorPosition = 0
+        if ($this.MultiLine -and -not $Ctrl) {
+            $oCursor = $this.GetCursorLineColumn()
+            $this.CursorPosition = $this.GetFlatPosition($oCursor.Line, 0)
+        } else {
+            $this.CursorPosition = 0
+        }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressEnd" -Value {
-        Param([bool]$Shift = $false)
+        Param([bool]$Shift = $false, [bool]$Ctrl = $false)
         if ($Shift) {
             if ($null -eq $this.SelectionAnchor) { $this.SelectionAnchor = $this.CursorPosition }
         } else {
             $this.ClearSelection()
         }
-        $this.CursorPosition = $this.Text.Length
+        if ($this.MultiLine -and -not $Ctrl) {
+            $oCursor = $this.GetCursorLineColumn()
+            $aLines = $this.GetLines()
+            $this.CursorPosition = $this.GetFlatPosition($oCursor.Line, $aLines[$oCursor.Line].Length)
+        } else {
+            $this.CursorPosition = $this.Text.Length
+        }
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressSelectAll" -Value {
@@ -723,8 +847,13 @@
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressPaste" -Value {
         $sClipboard = Get-Clipboard -ErrorAction SilentlyContinue
         if (-not $sClipboard) { return }
-        # Flatten to single line
-        $sClipboard = ($sClipboard -join "").Replace("`r", "").Replace("`n", "")
+        if ($this.MultiLine) {
+            # Preserve newlines, normalize line endings
+            $sClipboard = ($sClipboard -join "`n").Replace("`r`n", "`n").Replace("`r", "`n")
+        } else {
+            # Flatten to single line
+            $sClipboard = ($sClipboard -join "").Replace("`r", "").Replace("`n", "")
+        }
         # Delete selection first if any
         $this.DeleteSelection() | Out-Null
         # Insert at cursor
@@ -800,17 +929,36 @@
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressUp" -Value {
+        if ($this.MultiLine) {
+            $oCursor = $this.GetCursorLineColumn()
+            if ($oCursor.Line -gt 0) {
+                $this.CursorPosition = $this.GetFlatPosition($oCursor.Line - 1, $oCursor.Column)
+                $this.ClearSelection()
+                $this.EnsureCursorVisible()
+                return
+            }
+        }
         $hResult = @{
             Key = [System.ConsoleKeyInfo]::new(0, [System.ConsoleKey]::UpArrow, $false, $false, $false)
-            Options = $this.CursorPosition
+            Options = if ($this.MultiLine) { $this.GetCursorLineColumn().Column } else { $this.CursorPosition }
         }
         return $hResult
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "PressDown" -Value {
+        if ($this.MultiLine) {
+            $oCursor = $this.GetCursorLineColumn()
+            $aLines = $this.GetLines()
+            if ($oCursor.Line -lt $aLines.Count - 1) {
+                $this.CursorPosition = $this.GetFlatPosition($oCursor.Line + 1, $oCursor.Column)
+                $this.ClearSelection()
+                $this.EnsureCursorVisible()
+                return
+            }
+        }
         $hResult = @{
             Key = [System.ConsoleKeyInfo]::new(0, [System.ConsoleKey]::DownArrow, $false, $false, $false)
-            Options = $this.CursorPosition
+            Options = if ($this.MultiLine) { $this.GetCursorLineColumn().Column } else { $this.CursorPosition }
         }
         return $hResult
     }
@@ -841,10 +989,22 @@
                 ([System.ConsoleKey]::RightArrow) { return $this.PressRight($bShift) }
                 ([System.ConsoleKey]::UpArrow) { return $this.PressUp() }
                 ([System.ConsoleKey]::DownArrow) { return $this.PressDown() }
-                ([System.ConsoleKey]::Home) { return $this.PressHome($bShift) }
-                ([System.ConsoleKey]::End) { return $this.PressEnd($bShift) }
+                ([System.ConsoleKey]::Home) { return $this.PressHome($bShift, $bCtrl) }
+                ([System.ConsoleKey]::End) { return $this.PressEnd($bShift, $bCtrl) }
                 ([System.ConsoleKey]::Backspace) { return $this.PressBackspace() }
                 ([System.ConsoleKey]::Delete) { return $this.PressDelete() }
+                ([System.ConsoleKey]::Enter) {
+                    if ($this.MultiLine) {
+                        $this.DeleteSelection() | Out-Null
+                        $sPrefix = if ($this.CursorPosition -gt 0) { $this.Text.Substring(0, $this.CursorPosition) } else { "" }
+                        $sSuffix = if ($this.CursorPosition -lt $this.Text.Length) { $this.Text.Substring($this.CursorPosition) } else { "" }
+                        $this.Text = $sPrefix + "`n" + $sSuffix
+                        $this.CursorPosition++
+                        $this.EnsureCursorVisible()
+                        return
+                    }
+                    return $KeyInfo
+                }
                 default {
                     return $KeyInfo
                 }
@@ -887,8 +1047,25 @@
         }
     }
 
+    $hResult | Add-Member -MemberType ScriptMethod -Name "SetCursorPositionAtLine" -Value {
+        Param(
+            [int]$Line,
+            [int]$Column
+        )
+        $this.ClearSelection()
+        $aLines = $this.GetLines()
+        # -1 means last line
+        if ($Line -lt 0) { $Line = $aLines.Count - 1 }
+        if ($Line -ge $aLines.Count) { $Line = $aLines.Count - 1 }
+        $this.CursorPosition = $this.GetFlatPosition($Line, $Column)
+        $this.EnsureCursorVisible()
+    }
+
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetTextHeight" -Value {
-        return $this.Text.Split("`n").Count
+        if ($this.MultiLine) {
+            return $this.GetCurrentVisibleLineCount()
+        }
+        return 1
     }
 
     $hResult | Add-Member -MemberType ScriptMethod -Name "GetTextWidth" -Value {
