@@ -312,8 +312,7 @@ Creates an editable text input field with cursor navigation, validation, and pas
 | `Prefix` / `FocusedPrefix` | `string` | — | Prefix before the field (e.g., `"  "` / `"> "`) |
 | `Name` | `string` | `"textbox" + Header` | Unique identifier |
 | `MultiLine` | `switch` | — | Enable multi-line text input mode |
-| `MinVisibleLines` | `int` | `2` | Minimum visible lines in multi-line mode |
-| `MaxVisibleLines` | `int` | `5` | Maximum visible lines in multi-line mode |
+| `VisibleLines` | `int` | `5` | Number of visible lines in multi-line mode |
 | `MultiLineOverflowMode` | `string` | `"Truncate"` | `"Truncate"` or `"WordWrap"` for multi-line overflow handling |
 
 **Color parameters** (defaults from [theme](#theme)): `TextForegroundColor`, `TextBackgroundColor`, `HeaderForegroundColor`, `HeaderBackgroundColor`, `FocusedTextForegroundColor`, `FocusedTextBackgroundColor`, `FocusedHeaderForegroundColor`, `FocusedHeaderBackgroundColor`, `SelectionForegroundColor`, `SelectionBackgroundColor`, `SelectionCursorBackgroundColor`
@@ -355,18 +354,18 @@ TextBoxes support input history via `Ctrl+Up/Down`. Previously validated values 
 
 #### Multi-Line Mode
 
-Enable multi-line input with the `-MultiLine` switch. The text area grows dynamically as new lines are added (from `MinVisibleLines` to `MaxVisibleLines`).
+Enable multi-line input with the `-MultiLine` switch. The text area has a fixed height defined by `VisibleLines`.
 
 ```powershell
-# Multi-line text input for DNS names
-New-CLIDialogTextBox -Header "DNS Names" -MultiLine -MaxVisibleLines 5 -Prefix "  " -FocusedPrefix "> "
+# Multi-line text input for DNS names (5 visible lines)
+New-CLIDialogTextBox -Header "DNS Names" -MultiLine -VisibleLines 5 -Prefix "  " -FocusedPrefix "> "
 ```
 
-- **Enter** inserts a new line; the visible area grows up to `MaxVisibleLines`
+- **Enter** inserts a new line
 - **Up/Down** arrows navigate between lines; at the first/last line, focus passes to the adjacent control
 - **Home/End** move to the start/end of the current line; **Ctrl+Home/End** move to the start/end of the entire text
 - **Ctrl+V** preserves newlines when pasting
-- When lines exceed `MaxVisibleLines`, the viewport scrolls vertically to keep the cursor visible
+- When lines exceed `VisibleLines`, the viewport scrolls vertically to keep the cursor visible
 - `GetValue()` returns the full text with `\n` as line separator
 
 #### Keyboard Shortcuts in TextBox
