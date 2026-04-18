@@ -481,9 +481,10 @@ function Read-CLIDialogConnectionInfo {
             $oDialogResult = Invoke-CLIDialog -InputObject $oDialog -Validate -ErrorDetails -PauseAfterErrorMessage
             if ($oDialogResult.PSTypeNames[0] -like "DialogResult.Action.*" -and $oDialogResult.PSTypeNames[0] -ne "DialogResult.Action.Validate") {
                 if ($ReturnDialogResult) {
-                    return $oDialogResult
+                    $oResult = $oDialogResult
+                } else {
+                    $oResult = $null
                 }
-                $oResult = $null
             } else {
                 $hResult = $oDialogResult.DialogResult.Form.GetValue()
                 $oResult = if ($AsHashtable.IsPresent) {
@@ -497,6 +498,8 @@ function Read-CLIDialogConnectionInfo {
     End {
         if ($null -eq $oResult) {
             return $null
+        } elseif ($oResult.psobject.TypeNames[0] -like "DialogResult.Action.*") {
+            return $oResult
         } else {
             $oResult.psobject.TypeNames.Insert(0, "ConnectionInfo")
             if ($oResult.Username -and $oResult.Password) {
