@@ -79,6 +79,7 @@ function Edit-CLIDialogObjectArray {
         if ($aItems.Count -gt 1) {
             $aOrganizationItems += New-CLIDialogSpace
             $aOrganizationItems += New-CLIDialogButton -Text "Move &Up" -MoveUp
+            $aOrganizationItems += New-CLIDialogSpace
             $aOrganizationItems += New-CLIDialogButton -Text "Move &Down" -MoveDown
         }
 
