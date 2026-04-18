@@ -255,7 +255,7 @@ function Select-CLIDialogObjectInArray {
         Module: CLIDialog
         Author: Loïc Ade
         Created: 2025-10-25
-        Version: 1.3.0
+        Version: 1.4.0
         Dependencies: New-CLIDialog, New-CLIDialogButton, New-CLIDialogSeparator, New-CLIDialogText,
                      New-CLIDialogTableItems, New-CLIDialogObjectsRow, Invoke-CLIDialog,
                      New-DialogResultValue, New-DialogResultAction, Invoke-YesNoCLIDialog,
@@ -320,6 +320,13 @@ function Select-CLIDialogObjectInArray {
         - Useful for dynamic actions like refresh, settings, custom operations
 
         CHANGELOG:
+
+        Version 1.4.0 - 2026-04-09 - Loïc Ade
+            - Added PassthroughActions parameter: actions in this list are returned to the caller
+              with FocusedObject and FocusedIndex instead of being processed internally
+            - Added DefaultFocusedIndex parameter: pre-positions focus on a specific item by
+              absolute index (auto-calculates page and position within page)
+            - Fixed FocusedRow offset bug in New-CLIObjectListPage (removed erroneous +1 offset)
 
         Version 1.3.0 - 2026-03-22 - Loïc Ade
             - Renamed ShowBackButton to AllowBack (ShowBackButton kept as alias) for consistency with other Select-* functions
@@ -394,7 +401,9 @@ function Select-CLIDialogObjectInArray {
         [Alias("ShowBackButton")]
         [switch]$AllowBack,
         [switch]$UseArrayPageExtractor,
-        [string]$ValueColumnName = "Value"
+        [string]$ValueColumnName = "Value",
+        [string[]]$PassthroughActions,
+        [int]$DefaultFocusedIndex = -1
     )
 
     Begin {
@@ -573,8 +582,7 @@ function Select-CLIDialogObjectInArray {
 
             $oDialog = New-CLIDialog @hDialogParams
             if ($FocusedItemIndex -ge 0) {
-                # Header row (1) + item index
-                $oDialog.FocusedRow = 1 + $FocusedItemIndex
+                $oDialog.FocusedRow = $FocusedItemIndex
             }
             $oDialogResult = Invoke-CLIDialog -InputObject $oDialog
 
@@ -722,6 +730,13 @@ function Select-CLIDialogObjectInArray {
             $iFocusedItemIndex = -1
         }
 
+        # Override with DefaultFocusedIndex if specified and no SelectedObjects focus
+        if ($DefaultFocusedIndex -ge 0 -and $iFocusedItemIndex -lt 0 -and $aObjects.Count -gt 0) {
+            $iSafeFocusIndex = [Math]::Min($DefaultFocusedIndex, $aObjects.Count - 1)
+            $iPageNumber = [Math]::Floor($iSafeFocusIndex / $ItemsPerPage)
+            $iFocusedItemIndex = $iSafeFocusIndex - ($iPageNumber * $ItemsPerPage)
+        }
+
         # Initialize ArrayPageExtractor if requested
         $ArrayPageSelector = if ($UseArrayPageExtractor) {
             New-ArrayPageExtractor -Objects $aObjects -ItemsPerPage $ItemsPerPage
@@ -780,6 +795,31 @@ function Select-CLIDialogObjectInArray {
 
             # Display dialog
             $oResult = New-CLIObjectListPage @hDialogParams
+
+            # Passthrough actions: return to caller with focused item info
+            if ($PassthroughActions -and $oResult.Action -and ($oResult.Action -in $PassthroughActions)) {
+                $iCurrentPageItemCount = if ($aPage) { @($aPage).Count } else { 0 }
+                $iFocusedPageIndex = -1
+                if ($oResult.DialogResult -and $oResult.DialogResult.Form) {
+                    $iDialogFocusedRow = $oResult.DialogResult.Form.FocusedRow
+                    if ($iDialogFocusedRow -ge 0 -and $iDialogFocusedRow -lt $iCurrentPageItemCount) {
+                        $iFocusedPageIndex = $iDialogFocusedRow
+                    }
+                }
+                if ($iFocusedPageIndex -lt 0) {
+                    $iFocusedPageIndex = 0
+                }
+                $iPageStart = if ($UseArrayPageExtractor) { $ArrayPageSelector.Page * $ItemsPerPage } else { $iPageNumber * $ItemsPerPage }
+                $iFocusedAbsoluteIndex = if ($aObjects.Count -gt 0) {
+                    [Math]::Min($iPageStart + $iFocusedPageIndex, $aObjects.Count - 1)
+                } else { -1 }
+                $oFocusedObject = if ($iFocusedAbsoluteIndex -ge 0) { $aObjects[$iFocusedAbsoluteIndex] } else { $null }
+
+                $hPassthroughResult = New-DialogResultAction -Action $oResult.Action
+                $hPassthroughResult.FocusedObject = $oFocusedObject
+                $hPassthroughResult.FocusedIndex = $iFocusedAbsoluteIndex
+                return $hPassthroughResult
+            }
 
             # Handle result
             switch ($oResult.PSTypeNames[0]) {
