@@ -7,6 +7,8 @@ function Select-CLIDialogObjectInArray {
         This function is a comprehensive merger of Select-CLIObjectInArray and Select-CLIDialogObject,
         providing a unified interface for object selection with extensive customization options.
 
+        The -UseArrayPageExtractor switch requires the PSSomeDataThings module (provides New-ArrayPageExtractor).
+
         Key features:
         - Automatic pagination with configurable items per page
         - Single or multi-selection modes with checkboxes
@@ -252,14 +254,10 @@ function Select-CLIDialogObjectInArray {
         Using a string array with a custom column name for better readability.
 
     .NOTES
-        Module: CLIDialog
         Author: Loïc Ade
-        Created: 2025-10-25
-        Version: 1.4.0
-        Dependencies: New-CLIDialog, New-CLIDialogButton, New-CLIDialogSeparator, New-CLIDialogText,
-                     New-CLIDialogTableItems, New-CLIDialogObjectsRow, Invoke-CLIDialog,
-                     New-DialogResultValue, New-DialogResultAction, Invoke-YesNoCLIDialog,
-                     Read-NumericValue, New-ArrayPageExtractor (optional)
+        Version: 1.5.0
+
+        External dependencies (only when -UseArrayPageExtractor is used): PSSomeDataThings (New-ArrayPageExtractor)
 
         This function represents a comprehensive solution for object selection in PowerShell CLI
         environments, merging the best features of two previous implementations while maintaining
@@ -321,6 +319,10 @@ function Select-CLIDialogObjectInArray {
 
         CHANGELOG:
 
+        Version 1.5.0 - 2026-04-19 - Loïc Ade
+            - Added runtime check for PSSomeDataThings module when -UseArrayPageExtractor is used
+            - Color parameter defaults now resolve from the current CLI dialog theme (Get-CLIDialogTheme)
+
         Version 1.4.0 - 2026-04-09 - Loïc Ade
             - Added PassthroughActions parameter: actions in this list are returned to the caller
               with FocusedObject and FocusedIndex instead of being processed internally
@@ -370,10 +372,10 @@ function Select-CLIDialogObjectInArray {
         [object[]]$SelectedColumns,
         [object]$Sort,
         [string]$SelectHeaderMessage = "Please select an item:",
-        [System.ConsoleColor]$HeaderColor = (Get-Host).UI.RawUI.ForegroundColor,
+        [System.ConsoleColor]$HeaderColor = (Get-CLIDialogTheme "ForegroundColor"),
         [AllowNull()]
         [string]$FooterMessage, # = "Please type item number",
-        [System.ConsoleColor]$FooterColor = (Get-Host).UI.RawUI.ForegroundColor,
+        [System.ConsoleColor]$FooterColor = (Get-CLIDialogTheme "ForegroundColor"),
         [AllowEmptyString()]
         [string]$EmptyArrayMessage = "No items in array",
         [object[]]$OtherMenuItems,
@@ -384,7 +386,7 @@ function Select-CLIDialogObjectInArray {
         [switch]$NoEmptyLineAfterItems,
         [ValidateScript({$_ -ge 1})]
         [int]$ItemsPerPage = 10,
-        [System.ConsoleColor]$SeparatorColor = (Get-Host).UI.RawUI.ForegroundColor,
+        [System.ConsoleColor]$SeparatorColor = (Get-CLIDialogTheme "SeparatorColor"),
         [switch]$HeaderTextInSeparator,
         [switch]$Space,
         [switch]$DontShowPageNumberWhenOnlyOnePage,
@@ -445,7 +447,7 @@ function Select-CLIDialogObjectInArray {
                 [string]$OtherMenuItemsHeader,
                 [switch]$OtherMenuItemsInvisibleHeader,
                 [object[]]$SelectedColumns,
-                [System.ConsoleColor]$SeparatorColor = (Get-Host).UI.RawUI.ForegroundColor,
+                [System.ConsoleColor]$SeparatorColor = (Get-CLIDialogTheme "SeparatorColor"),
                 [switch]$MultiSelect,
                 [ref]$SelectedObjectsArray,
                 [string]$SelectedObjectsUniqueProperty,
@@ -489,7 +491,7 @@ function Select-CLIDialogObjectInArray {
 
             # Selection counter (MultiSelect only)
             if ($MultiSelect -and $SelectedObjectsArray) {
-                $aCLIObject += New-CLIDialogObjectsRow -Header "Selection" -HeaderSeparator " :  " -HeaderForegroundColor (Get-Host).UI.RawUI.ForegroundColor -Row @(
+                $aCLIObject += New-CLIDialogObjectsRow -Header "Selection" -HeaderSeparator " :  " -HeaderForegroundColor (Get-CLIDialogTheme "ForegroundColor") -Row @(
                     New-CLIDialogText -TextFunctionArguments @{SelectedObjectsArray = $SelectedObjectsArray} -TextFunction {
                         Param([ref]$SelectedObjectsArray)
                         if ($SelectedObjectsArray.Value -eq $null) {
@@ -739,6 +741,9 @@ function Select-CLIDialogObjectInArray {
 
         # Initialize ArrayPageExtractor if requested
         $ArrayPageSelector = if ($UseArrayPageExtractor) {
+            if (-not (Get-Module -Name PSSomeDataThings) -and -not (Get-Module -ListAvailable -Name PSSomeDataThings)) {
+                throw "Select-CLIDialogObjectInArray -UseArrayPageExtractor requires the PSSomeDataThings module (provides New-ArrayPageExtractor). Please install or import it before calling this function."
+            }
             New-ArrayPageExtractor -Objects $aObjects -ItemsPerPage $ItemsPerPage
         } else {
             $null
