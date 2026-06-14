@@ -29,7 +29,7 @@
     VariablesToExport  = @()
 
     # Aliases to export from this module
-    AliasesToExport    = @()
+    AliasesToExport    = '*'
 
     # Private data to pass to the module specified in RootModule
     PrivateData       = @{

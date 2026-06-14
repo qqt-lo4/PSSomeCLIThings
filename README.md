@@ -55,6 +55,55 @@ Build interactive CLI dialogs with textboxes, buttons, checkboxes, radio buttons
 | `Get-CLIDialogTheme` | Retrieves the current dialog theme or a specific color property. Initializes the default theme on first call. Used by all components to resolve default colors. |
 | `Set-CLIDialogTheme` | Sets or resets the global dialog theme. All color parameters have standard defaults; only pass what you want to change. |
 
+### Object Dialog Engine
+
+A convention-driven engine that renders any object as an interactive, paginated dialog — property view, content tables, per-object menus and actions on embedded values — without the engine knowing anything about your domain. The host project supplies behaviour by defining functions whose names follow a contract (see below), and registers a default footer menu once via `Set-CLIDialogDefaultMenu`.
+
+| Function | Description |
+|---|---|
+| `Show-CLIDialogObject` | Engine entry point. Displays an object (optionally a named view), running the connect/convert/expand steps, building the dialog and driving the Back/Exit/Previous/Next/Refresh loop. This is the function you call. |
+| `New-CLIDialogObjectBuilder` | Builds a stateful, paginated builder for an object (header, properties, content, menu) exposing navigation methods (`GetDialog`, `NextPage`, `PreviousPage`, `Refresh`, ...). |
+| `Get-CLIDialogObject` | Assembles a single dialog form from an object's properties, optional paginated content table, object menu and footer menu. |
+| `Get-CLIDialogConnectFunction` | Resolves, by convention, the connection function to run before an object can be displayed. |
+| `Set-CLIDialogDefaultMenu` | Registers the default footer menu provider (a scriptblock) injected by the engine when no explicit menu override is given. Keeps the module project-agnostic. |
+| `Get-CLIDialogDefaultMenu` | Returns the registered default footer menu provider. |
+
+#### Convention contract
+
+The engine resolves behaviour from functions the host project defines, named after the object's type and/or the requested function. `<Type>` is a PSTypeName with spaces removed; `<Func>` is the requested function name with spaces removed. For each row the engine tries the candidates in order and uses the first one that exists; all are optional unless stated.
+
+| Convention (in resolution order) | Purpose |
+|---|---|
+| `Connect-<Type>To<Func>` → `Connect-<Func>` → `Connect-<Func>_GUI` | Connection step, run first; may return a `DialogResult.Action.Cancel` to abort the display. |
+| `Convert-<Type>To<Func>` | Transform the object before it is rendered. |
+| `Expand-<Type>-<Func>_Object` → `Expand-<Type>_Object` | Enrich the object up-front. |
+| `Get-<Type>_ObjectName` | Display name for the header (else `.Name`, else `.ToString()`). |
+| `Get-<Type>-<Func>_ObjectProperties` → `Get-<Func>_ObjectProperties` → `Get-<Type>_ObjectProperties` | Property descriptors to display. |
+| `Add-<Type>Properties [-Properties]` | Load/compute the requested properties for sparse objects (resolved over the whole type hierarchy, first match wins). |
+| `Get-<Type>-<Func>_ObjectContent` → `Get-<Type>_ObjectContent` | Paginated content table. |
+| `Get-<Func>_ProjectMenu` → `Get-<Type>-<Func>_ProjectMenu` → `Get-<Type>_ProjectMenu` | Per-object menu. |
+| `Get-<Type>_DefaultProperty` | Default function name used when `-Function` is omitted. |
+| `Invoke-<Type>-<Func>_FunctionOnObject` → `Invoke-<Type>_FunctionOnObject` | Action run on a selected value; when none exists, selecting a value recurses into `Show-CLIDialogObject`. |
+
+#### Wiring
+
+The host registers the default footer menu once at startup (and may configure colors):
+
+```powershell
+Set-CLIDialogDefaultMenu { Get-MyProjectMenu }   # e.g. a Back / Search / Exit row
+Set-CLIDialogTheme -HighlightColor Cyan
+```
+
+Then display any object — the engine discovers the matching convention functions automatically:
+
+```powershell
+# Default view (uses Get-<Type>_DefaultProperty)
+Show-CLIDialogObject $user
+
+# A named view (resolves Get-<Type>-AllInfo_ObjectProperties, etc.)
+Show-CLIDialogObject $computer "All Info"
+```
+
 ### Menu Builder
 Create interactive navigable menus with sub-menus, actions, and scriptblock execution.
 
@@ -186,10 +235,11 @@ PSSomeCLIThings/
 ├── LICENSE                       # PolyForm Noncommercial License 1.0.0
 ├── Dialog/
 │   ├── Base/                     # Core dialog building blocks (14 functions)
+│   ├── Theme/                    # Centralized color theme (2 functions)
 │   └── *.ps1                     # High-level dialog functions (14 functions)
+├── Object/                       # Convention-driven object dialog engine (6 functions)
 ├── Format/                       # Console formatting utilities (6 functions)
 ├── Menu/                         # Menu builder (5 functions)
-├── Theme/                        # Centralized color theme (2 functions)
 ├── Other/                        # Miscellaneous CLI helpers (7 functions)
 └── String/                       # String formatting utilities (2 functions)
 ```
