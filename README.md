@@ -78,10 +78,10 @@ The engine resolves behaviour from functions the host project defines, named aft
 | `Convert-<Type>To<Func>` | Transform the object before it is rendered. |
 | `Expand-<Type>-<Func>_Object` → `Expand-<Type>_Object` | Enrich the object up-front. |
 | `Get-<Type>_ObjectName` | Display name for the header (else `.Name`, else `.ToString()`). |
-| `Get-<Type>-<Func>_ObjectProperties` → `Get-<Func>_ObjectProperties` → `Get-<Type>_ObjectProperties` | Property descriptors to display. |
+| Property registry (`Register-CLIObjectProperty`, see below) → `Get-<Type>-<Func>_ObjectProperties` → `Get-<Func>_ObjectProperties` → base-view registry inheritance → `Get-<Type>_ObjectProperties` | Property descriptors to display, resolved by `Get-CLIObjectPropertyList`. |
 | `Add-<Type>Properties [-Properties]` | Load/compute the requested properties for sparse objects (resolved over the whole type hierarchy, first match wins). |
 | `Get-<Type>-<Func>_ObjectContent` → `Get-<Type>_ObjectContent` | Paginated content table. |
-| `Get-<Func>_ProjectMenu` → `Get-<Type>-<Func>_ProjectMenu` → `Get-<Type>_ProjectMenu` | Per-object menu. |
+| Menu registry (`Register-CLIMenuButton`, see below) → `Get-<Func>_ProjectMenu` → `Get-<Type>-<Func>_ProjectMenu` → `Get-<Type>_ProjectMenu` | Per-object menu, built by `New-CLIDialogMenuFromRegistry`. |
 | `Get-<Type>_DefaultProperty` | Default function name used when `-Function` is omitted. |
 | `Invoke-<Type>-<Func>_FunctionOnObject` → `Invoke-<Type>_FunctionOnObject` | Action run on a selected value; when none exists, selecting a value recurses into `Show-CLIDialogObject`. |
 
@@ -102,6 +102,31 @@ Show-CLIDialogObject $user
 
 # A named view (resolves Get-<Type>-AllInfo_ObjectProperties, etc.)
 Show-CLIDialogObject $computer "All Info"
+```
+
+#### Declarative registries (menus & properties)
+
+Both the per-object menu and the displayed property list can be assembled from declarative **registries** instead of `Get-<…>_ProjectMenu` / `Get-<…>_ObjectProperties` functions. A module contributes to the registries by dot-sourcing two conventional files at load time (alongside its other functions): `_Menu.ps1` (buttons), `_Properties.ps1` (properties), plus `_Types.ps1` for IS-A type aliases. This lets a *client/custom* module **add, override or hide** entries for a given environment without touching the base module — e.g. renaming Trellix "Custom property 1..8" to a customer's real meaning, or hiding a property.
+
+| Function | Description |
+|---|---|
+| `Register-CLIMenuButton` / `New-CLIDialogMenuFromRegistry` | Register a menu button (Type, MenuRow, Name, Text, Object, Function, Filter, Order) / build the menu rows for an object. |
+| `Register-CLIObjectProperty` / `Get-CLIObjectPropertyList` | Register a property (Type, Name, Header, Expression, Function, Filter, After/Before/Order, HideIfEmpty, Options; or `-Hide`) / build the ordered property descriptors for an object+view. |
+| `Register-CLIMenuTypeAlias` / `Resolve-CLIMenuType` | Declare that a concrete type *is also* a generic token (e.g. `ADComputer` → `Computer`) / resolve an object's ordered type tokens (specific → generic → `*`). |
+| `Clear-CLIMenuRegistry` / `Clear-CLIPropertyRegistry` | Reset a registry (reload-safe; registration also auto-initialises and replaces same `(Type, Name)` in place). |
+
+Shared rules: entries are keyed by **type token** then a **unique, stable `Name`** (e.g. `ADUser.LogonInfo.PasswordExpired`) — the Name is the override/hide/anchor key and a future i18n key, never the displayed label. `Function` scopes the entry to a view (`""` = base, `"<view>"`, or `"*"` = all). `Filter` is a per-object predicate (a filter that throws hides the entry). Entries resolve from the most specific type token to the most generic, then by declaration order.
+
+Property resolution (`Get-CLIObjectPropertyList`) stays faithful to the legacy chain: the registry view wins; otherwise a legacy `Get-<Type>-<Func>_ObjectProperties` is consulted (so a `$null`-returning content-view function still suppresses the property block); otherwise a non-base view inherits the type's **base** (`Function ""`) registry properties; otherwise the legacy base function. A type with no registered entry behaves exactly as before (legacy functions).
+
+```powershell
+# In a base module's _Properties.ps1
+Register-CLIObjectProperty -Type ADUser -Name "ADUser.Department" -Header "Department" -Expression { $_.department }
+
+# In a client/custom module's _Properties.ps1 (loaded after the base)
+Register-CLIObjectProperty -Type ADUser -Name "ADUser.EmployeeId" -Header "Matricule" `
+    -Expression { $_.employeeID } -After "ADUser.Department"     # add, positioned by anchor
+Register-CLIObjectProperty -Type ADUser -Name "ADUser.Company" -Hide                       # hide a base property
 ```
 
 ### Menu Builder
